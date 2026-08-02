@@ -11,8 +11,15 @@ package = JSON.parse(
 )
 
 Pod::Spec.new do |s|
-  s.name = 'TripleNBackground'
-  s.version = package['version']
+  s.name =
+    'TripleNBackground'
+
+  s.module_name =
+    'TripleNBackground'
+
+  s.version =
+    package['version']
+
   s.summary =
     package['description'] ||
     'Triple N background processing module'
@@ -25,8 +32,11 @@ Pod::Spec.new do |s|
     package['license'] ||
     'MIT'
 
-  s.author = 'Triple N'
-  s.homepage = 'https://triplen.app'
+  s.author =
+    'Triple N'
+
+  s.homepage =
+    'https://triplen.app'
 
   s.platforms = {
     :ios => '15.1'
@@ -36,11 +46,15 @@ Pod::Spec.new do |s|
     :path => '.'
   }
 
-  s.static_framework = true
-  s.swift_version = '5.9'
+  s.static_framework =
+    true
+
+  s.swift_version =
+    '5.9'
 
   s.source_files =
-    '**/*.{h,m,mm,swift}'
+    'TripleNBackgroundModule.swift'
 
-  s.dependency 'ExpoModulesCore'
+  s.dependency
+    'ExpoModulesCore'
 end
