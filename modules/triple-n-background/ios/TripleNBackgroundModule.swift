@@ -1,4 +1,4 @@
-import ExpoModulesCore
+﻿import ExpoModulesCore
 import UIKit
 
 public final class TripleNBackgroundModule: Module {
@@ -642,8 +642,7 @@ public final class TripleNBackgroundModule: Module {
   }
 
   @MainActor
-  private func normalizedBackgroundTimeRemaining():
-    Double {
+  private func normalizedBackgroundTimeRemaining() -> Double {
     let remaining =
       UIApplication
         .shared
