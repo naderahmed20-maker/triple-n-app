@@ -1,0 +1,13 @@
+{
+  "name": "triple-n-background",
+  "version": "1.0.0",
+  "description": "Triple N native background processing module",
+  "main": "src/index.ts",
+  "private": true,
+  "license": "MIT",
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}
