@@ -41,7 +41,7 @@ Pod::Spec.new do |s|
   }
 
   s.source_files =
-    'TripleNBackgroundModule.swift'
+  '*.{h,m,mm,swift}'
 
   s.dependency 'ExpoModulesCore'
 end

@@ -2,15 +2,9 @@
 import UIKit
 
 public final class TripleNBackgroundModule: Module {
-  private let stateQueue =
-    DispatchQueue(
-      label:
-        "com.naderahmed22.triplen.background.state"
-    )
-
   private var backgroundTaskIdentifier:
     UIBackgroundTaskIdentifier =
-    .invalid
+      .invalid
 
   private var activeTaskId:
     String?
@@ -20,15 +14,19 @@ public final class TripleNBackgroundModule: Module {
 
   private var latestProgress:
     Double =
-    0.0
+      0.0
 
   private var latestStage:
     String =
-    "idle"
+      "idle"
 
   private var latestMessage:
     String =
-    ""
+      ""
+
+  private var activeExecutor:
+    String =
+      "idle"
 
   public func definition() -> ModuleDefinition {
     Name(
@@ -48,6 +46,13 @@ public final class TripleNBackgroundModule: Module {
       "ios"
     }
 
+    /*
+     * هذه القيمة تشير إلى توفر الموديول نفسه.
+     *
+     * حتى على إصدارات iOS الأقدم من iOS 26،
+     * ما زال UIApplication background task متاحًا
+     * كـfallback.
+     */
     Constant(
       "available"
     ) {
@@ -58,7 +63,12 @@ public final class TripleNBackgroundModule: Module {
       "isAvailable"
     ) { () -> [String: Any] in
       return await MainActor.run {
-        [
+        let continuedSupported =
+          BackgroundTaskManager
+            .shared
+            .isSupported()
+
+        return [
           "available":
             true,
 
@@ -66,7 +76,12 @@ public final class TripleNBackgroundModule: Module {
             "ios",
 
           "executor":
-            "ios-background-task",
+            continuedSupported
+              ? "bg-continued-processing-task"
+              : "ios-background-task",
+
+          "continuedProcessingAvailable":
+            continuedSupported,
 
           "applicationState":
             self.applicationStateName(
@@ -177,6 +192,9 @@ public final class TripleNBackgroundModule: Module {
           reason:
             "completed",
 
+          completed:
+            true,
+
           emitEvent:
             true
         )
@@ -193,22 +211,36 @@ public final class TripleNBackgroundModule: Module {
 
     OnDestroy {
       Task {
-        await MainActor.run {
-          _ =
-            self.endBackgroundTask(
-              requestedTaskId:
-                nil,
+        @MainActor
+        [weak self] in
 
-              reason:
-                "module-destroyed",
-
-              emitEvent:
-                false
-            )
+        guard
+          let self
+        else {
+          return
         }
+
+        _ =
+          self.endBackgroundTask(
+            requestedTaskId:
+              nil,
+
+            reason:
+              "module-destroyed",
+
+            completed:
+              false,
+
+            emitEvent:
+              false
+          )
       }
     }
   }
+
+  /* =======================================================
+   * Start
+   * ===================================================== */
 
   @MainActor
   private func beginBackgroundTask(
@@ -217,17 +249,35 @@ public final class TripleNBackgroundModule: Module {
     taskName:
       String?
   ) -> [String: Any] {
+    /*
+     * لو نفس المهمة تعمل بالفعل،
+     * نعيد حالتها بدل بدء مهمة ثانية.
+     */
     if
-      backgroundTaskIdentifier !=
-        .invalid
+      isAnyTaskRunning()
     {
       if
         activeTaskId ==
           taskId
       {
-        return createStatePayload()
+        return createStatePayload(
+          additionalValues: [
+            "accepted":
+              true,
+
+            "started":
+              true,
+
+            "alreadyRunning":
+              true
+          ]
+        )
       }
 
+      /*
+       * توجد مهمة أخرى تعمل.
+       * ننهيها قبل بدء المهمة الجديدة.
+       */
       _ =
         endBackgroundTask(
           requestedTaskId:
@@ -236,21 +286,20 @@ public final class TripleNBackgroundModule: Module {
           reason:
             "replaced",
 
+          completed:
+            false,
+
           emitEvent:
             true
         )
     }
 
     let normalizedName =
-      taskName?
-        .trimmingCharacters(
-          in:
-            .whitespacesAndNewlines
-        )
-        .isEmpty ==
-        false
-        ? taskName!
-        : "Triple N Scan Item Processing"
+      normalizeText(
+        taskName,
+        fallback:
+          "Triple N Scan Item Processing"
+      )
 
     activeTaskId =
       taskId
@@ -268,35 +317,209 @@ public final class TripleNBackgroundModule: Module {
     latestMessage =
       "Background processing started."
 
-    backgroundTaskIdentifier =
+    activeExecutor =
+      "starting"
+
+    /*
+     * iOS 26 وما بعده:
+     *
+     * نحاول استخدام BGContinuedProcessingTask أولًا.
+     */
+    if
+      BackgroundTaskManager
+        .shared
+        .isSupported()
+    {
+      let continuedResult =
+        BackgroundTaskManager
+          .shared
+          .start(
+            identifier:
+              BackgroundTaskManager
+                .taskIdentifier,
+
+            title:
+              normalizedName,
+
+            subtitle:
+              latestMessage,
+
+            onExpiration: {
+              [weak self]
+              reason in
+
+              Task {
+                @MainActor
+                [weak self] in
+
+                self?
+                  .handleContinuedProcessingExpiration(
+                    reason:
+                      reason
+                  )
+              }
+            },
+
+            onCancellation: {
+              [weak self]
+              reason in
+
+              Task {
+                @MainActor
+                [weak self] in
+
+                self?
+                  .handleContinuedProcessingCancellation(
+                    reason:
+                      reason
+                  )
+              }
+            }
+          )
+
+      if
+        continuedResult.accepted
+      {
+        activeExecutor =
+          "bg-continued-processing-task"
+
+        latestStage =
+          continuedResult.running
+            ? "running"
+            : "submitted"
+
+        latestMessage =
+          continuedResult.running
+            ? "Background processing is running."
+            : "Background processing was submitted to iOS."
+
+        let payload =
+          createStatePayload(
+            additionalValues: [
+              "accepted":
+                true,
+
+              "started":
+                true,
+
+              "submitted":
+                continuedResult.submitted,
+
+              "alreadyRunning":
+                continuedResult.running,
+
+              "continuedProcessing":
+                true,
+
+              "continuedProcessingState":
+                continuedResult
+                  .state
+                  .rawValue
+            ]
+          )
+
+        sendEvent(
+          "onBackgroundTaskStarted",
+          payload
+        )
+
+        return payload
+      }
+    }
+
+    /*
+     * Fallback:
+     *
+     * يستخدم على إصدارات iOS الأقدم من iOS 26،
+     * أو عندما يرفض النظام BGContinuedProcessingTask.
+     */
+    return beginLegacyBackgroundTask(
+      taskId:
+        taskId,
+
+      taskName:
+        normalizedName
+    )
+  }
+
+  /* =======================================================
+   * Legacy fallback
+   * ===================================================== */
+
+  @MainActor
+  private func beginLegacyBackgroundTask(
+    taskId:
+      String,
+    taskName:
+      String
+  ) -> [String: Any] {
+    latestStage =
+      "running"
+
+    latestMessage =
+      "Background processing is running."
+
+    let identifier =
       UIApplication
         .shared
         .beginBackgroundTask(
           withName:
-            normalizedName
+            taskName
         ) {
           Task {
-            await MainActor.run {
-              self.handleExpiration()
-            }
+            @MainActor
+            [weak self] in
+
+            self?
+              .handleLegacyExpiration()
           }
         }
 
+    backgroundTaskIdentifier =
+      identifier
+
     guard
-      backgroundTaskIdentifier !=
+      identifier !=
         .invalid
     else {
+      backgroundTaskIdentifier =
+        .invalid
+
+      activeExecutor =
+        "idle"
+
+      let failedTaskId =
+        taskId
+
       clearState()
 
       return [
         "accepted":
           false,
 
+        "started":
+          false,
+
+        "submitted":
+          false,
+
+        "running":
+          false,
+
         "taskId":
-          taskId,
+          failedTaskId,
+
+        "nativeTaskId":
+          failedTaskId,
 
         "platform":
           "ios",
+
+        "executor":
+          "ios-background-task",
+
+        "continuedProcessing":
+          false,
 
         "status":
           "unavailable",
@@ -309,11 +532,26 @@ public final class TripleNBackgroundModule: Module {
       ]
     }
 
+    activeExecutor =
+      "ios-background-task"
+
     let payload =
       createStatePayload(
         additionalValues: [
           "accepted":
-            true
+            true,
+
+          "started":
+            true,
+
+          "submitted":
+            true,
+
+          "alreadyRunning":
+            false,
+
+          "continuedProcessing":
+            false
         ]
       )
 
@@ -324,6 +562,10 @@ public final class TripleNBackgroundModule: Module {
 
     return payload
   }
+
+  /* =======================================================
+   * Update
+   * ===================================================== */
 
   @MainActor
   private func updateBackgroundTaskState(
@@ -337,20 +579,28 @@ public final class TripleNBackgroundModule: Module {
       String?
   ) -> [String: Any] {
     guard
-      backgroundTaskIdentifier !=
-        .invalid,
       activeTaskId ==
-        taskId
+        taskId,
+      isAnyTaskRunning()
     else {
       return [
         "updated":
           false,
 
+        "running":
+          false,
+
         "taskId":
+          taskId,
+
+        "nativeTaskId":
           taskId,
 
         "platform":
           "ios",
+
+        "executor":
+          activeExecutor,
 
         "status":
           "not-running",
@@ -369,31 +619,59 @@ public final class TripleNBackgroundModule: Module {
       )
 
     if
-      let stage,
-      !stage
-        .trimmingCharacters(
-          in:
-            .whitespacesAndNewlines
-        )
-        .isEmpty
+      let stage
     {
-      latestStage =
+      let normalizedStage =
         stage
           .trimmingCharacters(
             in:
               .whitespacesAndNewlines
           )
+
+      if
+        !normalizedStage
+          .isEmpty
+      {
+        latestStage =
+          normalizedStage
+      }
     }
 
     if
       let message
     {
-      latestMessage =
+      let normalizedMessage =
         message
           .trimmingCharacters(
             in:
               .whitespacesAndNewlines
           )
+
+      if
+        !normalizedMessage
+          .isEmpty
+      {
+        latestMessage =
+          normalizedMessage
+      }
+    }
+
+    if
+      activeExecutor ==
+        "bg-continued-processing-task"
+    {
+      BackgroundTaskManager
+        .shared
+        .update(
+          progress:
+            latestProgress,
+
+          title:
+            createContinuedProcessingTitle(),
+
+          subtitle:
+            createContinuedProcessingSubtitle()
+        )
     }
 
     let payload =
@@ -412,8 +690,12 @@ public final class TripleNBackgroundModule: Module {
     return payload
   }
 
+  /* =======================================================
+   * Legacy expiration
+   * ===================================================== */
+
   @MainActor
-  private func handleExpiration() {
+  private func handleLegacyExpiration() {
     guard
       backgroundTaskIdentifier !=
         .invalid
@@ -426,6 +708,9 @@ public final class TripleNBackgroundModule: Module {
         additionalValues: [
           "expired":
             true,
+
+          "running":
+            false,
 
           "status":
             "expired",
@@ -451,10 +736,123 @@ public final class TripleNBackgroundModule: Module {
         reason:
           "expired",
 
+        completed:
+          false,
+
         emitEvent:
           false
       )
   }
+
+  /* =======================================================
+   * Continued-processing expiration
+   * ===================================================== */
+
+  @MainActor
+  private func handleContinuedProcessingExpiration(
+    reason:
+      String
+  ) {
+    guard
+      activeExecutor ==
+        "bg-continued-processing-task"
+    else {
+      return
+    }
+
+    let payload =
+      createStatePayload(
+        additionalValues: [
+          "expired":
+            true,
+
+          "running":
+            false,
+
+          "status":
+            "expired",
+
+          "reason":
+            reason,
+
+          "errorCode":
+            "CONTINUED_PROCESSING_EXPIRED",
+
+          "errorMessage":
+            reason
+        ]
+      )
+
+    activeExecutor =
+      "idle"
+
+    backgroundTaskIdentifier =
+      .invalid
+
+    clearState()
+
+    sendEvent(
+      "onBackgroundTaskExpired",
+      payload
+    )
+  }
+
+  /* =======================================================
+   * Continued-processing cancellation
+   * ===================================================== */
+
+  @MainActor
+  private func handleContinuedProcessingCancellation(
+    reason:
+      String
+  ) {
+    guard
+      activeExecutor ==
+        "bg-continued-processing-task"
+    else {
+      return
+    }
+
+    let payload =
+      createStatePayload(
+        additionalValues: [
+          "stopped":
+            true,
+
+          "running":
+            false,
+
+          "status":
+            "cancelled",
+
+          "reason":
+            reason,
+
+          "errorCode":
+            "CONTINUED_PROCESSING_CANCELLED",
+
+          "errorMessage":
+            reason
+        ]
+      )
+
+    activeExecutor =
+      "idle"
+
+    backgroundTaskIdentifier =
+      .invalid
+
+    clearState()
+
+    sendEvent(
+      "onBackgroundTaskStopped",
+      payload
+    )
+  }
+
+  /* =======================================================
+   * Stop
+   * ===================================================== */
 
   @MainActor
   private func endBackgroundTask(
@@ -462,6 +860,8 @@ public final class TripleNBackgroundModule: Module {
       String?,
     reason:
       String,
+    completed:
+      Bool,
     emitEvent:
       Bool
   ) -> [String: Any] {
@@ -484,11 +884,20 @@ public final class TripleNBackgroundModule: Module {
         "stopped":
           false,
 
+        "running":
+          isAnyTaskRunning(),
+
         "taskId":
+          normalizedRequestedTaskId,
+
+        "nativeTaskId":
           normalizedRequestedTaskId,
 
         "platform":
           "ios",
+
+        "executor":
+          activeExecutor,
 
         "status":
           "task-id-mismatch",
@@ -502,18 +911,32 @@ public final class TripleNBackgroundModule: Module {
     }
 
     guard
-      backgroundTaskIdentifier !=
-        .invalid
+      isAnyTaskRunning()
     else {
+      let taskIdValue:
+        Any =
+          activeTaskId ??
+          normalizedRequestedTaskId ??
+          NSNull()
+
       return [
         "stopped":
           false,
 
+        "running":
+          false,
+
         "taskId":
-          activeTaskId as Any,
+          taskIdValue,
+
+        "nativeTaskId":
+          taskIdValue,
 
         "platform":
           "ios",
+
+        "executor":
+          activeExecutor,
 
         "status":
           "idle",
@@ -523,8 +946,8 @@ public final class TripleNBackgroundModule: Module {
       ]
     }
 
-    let identifier =
-      backgroundTaskIdentifier
+    let executorBeingStopped =
+      activeExecutor
 
     let payload =
       createStatePayload(
@@ -532,22 +955,72 @@ public final class TripleNBackgroundModule: Module {
           "stopped":
             true,
 
+          "running":
+            false,
+
           "status":
-            "stopped",
+            completed
+              ? "completed"
+              : "stopped",
 
           "reason":
             reason
         ]
       )
 
-    backgroundTaskIdentifier =
-      .invalid
+    /*
+     * نغيّر executor قبل استدعاء cancel.
+     *
+     * BackgroundTaskManager.cancel قد يستدعي
+     * cancellation callback فورًا.
+     *
+     * تغيير القيمة هنا يمنع إرسال حدث إيقاف مكرر.
+     */
+    activeExecutor =
+      "stopping"
 
-    UIApplication
-      .shared
-      .endBackgroundTask(
-        identifier
-      )
+    if
+      executorBeingStopped ==
+        "bg-continued-processing-task"
+    {
+      if
+        completed
+      {
+        BackgroundTaskManager
+          .shared
+          .complete(
+            success:
+              true
+          )
+      } else {
+        BackgroundTaskManager
+          .shared
+          .cancel(
+            reason:
+              reason
+          )
+      }
+    }
+
+    if
+      backgroundTaskIdentifier !=
+        .invalid
+    {
+      let identifier =
+        backgroundTaskIdentifier
+
+      backgroundTaskIdentifier =
+        .invalid
+
+      UIApplication
+        .shared
+        .endBackgroundTask(
+          identifier
+        )
+    }
+
+    activeExecutor =
+      "idle"
 
     clearState()
 
@@ -563,34 +1036,56 @@ public final class TripleNBackgroundModule: Module {
     return payload
   }
 
+  /* =======================================================
+   * State payload
+   * ===================================================== */
+
   @MainActor
   private func createStatePayload(
     additionalValues:
       [String: Any] =
       [:]
   ) -> [String: Any] {
-    let isRunning =
-      backgroundTaskIdentifier !=
-      .invalid
+    let running =
+      isAnyTaskRunning()
+
+    let taskIdValue:
+      Any =
+        activeTaskId ??
+        NSNull()
+
+    let startedAtValue:
+      Any =
+        startedAt ??
+        NSNull()
 
     var payload:
       [String: Any] = [
+        "available":
+          true,
+
         "platform":
           "ios",
 
         "executor":
-          "ios-background-task",
+          activeExecutor,
 
         "running":
-          isRunning,
+          running,
 
         "status":
-          isRunning
+          running
             ? "processing"
             : "idle",
 
         "taskId":
-          activeTaskId as Any,
+          taskIdValue,
+
+        "nativeTaskId":
+          taskIdValue,
+
+        "nativeJobId":
+          NSNull(),
 
         "progress":
           latestProgress,
@@ -599,7 +1094,7 @@ public final class TripleNBackgroundModule: Module {
           Int(
             (
               latestProgress *
-              100.0
+                100.0
             )
             .rounded()
           ),
@@ -611,7 +1106,7 @@ public final class TripleNBackgroundModule: Module {
           latestMessage,
 
         "startedAt":
-          startedAt as Any,
+          startedAtValue,
 
         "updatedAt":
           Date()
@@ -625,8 +1120,43 @@ public final class TripleNBackgroundModule: Module {
             UIApplication
               .shared
               .applicationState
-          )
+          ),
+
+        "continuedProcessing":
+          activeExecutor ==
+            "bg-continued-processing-task",
+
+        "continuedProcessingAvailable":
+          BackgroundTaskManager
+            .shared
+            .isSupported()
       ]
+
+    if
+      activeExecutor ==
+        "bg-continued-processing-task"
+    {
+      let continuedPayload =
+        BackgroundTaskManager
+          .shared
+          .createStatePayload()
+
+      payload[
+        "continuedProcessingState"
+      ] =
+        continuedPayload[
+          "state"
+        ] ??
+        NSNull()
+
+      payload[
+        "continuedProcessingSubmitted"
+      ] =
+        continuedPayload[
+          "submitted"
+        ] ??
+        false
+    }
 
     for (
       key,
@@ -639,6 +1169,94 @@ public final class TripleNBackgroundModule: Module {
     }
 
     return payload
+  }
+
+  /* =======================================================
+   * Helpers
+   * ===================================================== */
+
+  @MainActor
+  private func isAnyTaskRunning() -> Bool {
+    if
+      backgroundTaskIdentifier !=
+        .invalid
+    {
+      return true
+    }
+
+    if
+      activeExecutor ==
+        "bg-continued-processing-task"
+    {
+      let payload =
+        BackgroundTaskManager
+          .shared
+          .createStatePayload()
+
+      return payload[
+        "running"
+      ] as?
+        Bool ??
+        false
+    }
+
+    return false
+  }
+
+  private func createContinuedProcessingTitle() -> String {
+    if
+      latestProgress >=
+        1.0
+    {
+      return "Wardrobe processing complete"
+    }
+
+    return "Processing your wardrobe"
+  }
+
+  private func createContinuedProcessingSubtitle() -> String {
+    let percentage =
+      Int(
+        (
+          latestProgress *
+            100.0
+        )
+        .rounded()
+      )
+
+    if
+      latestMessage
+        .isEmpty
+    {
+      return "\(percentage)% complete"
+    }
+
+    return
+      "\(percentage)% — \(latestMessage)"
+  }
+
+  private func normalizeText(
+    _ value:
+      String?,
+    fallback:
+      String
+  ) -> String {
+    let normalized =
+      value?
+        .trimmingCharacters(
+          in:
+            .whitespacesAndNewlines
+        )
+
+    if
+      let normalized,
+      !normalized
+        .isEmpty
+    {
+      return normalized
+    }
+
+    return fallback
   }
 
   @MainActor
@@ -702,6 +1320,7 @@ public final class TripleNBackgroundModule: Module {
     }
   }
 
+  @MainActor
   private func clearState() {
     activeTaskId =
       nil
@@ -724,6 +1343,6 @@ private final class InvalidBackgroundTaskIdException:
   Exception {
   override var reason:
     String {
-    "The iOS background task ID is missing."
+    return "The iOS background task ID is missing."
   }
 }
