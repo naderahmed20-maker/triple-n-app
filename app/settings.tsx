@@ -1,9 +1,16 @@
+import { useTranslation } from '@/lib/i18n';
 import { supabase } from '@/lib/supabase';
+
 import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+
+import {
+  useEffect,
+  useState,
+} from 'react';
+
 import {
   ActivityIndicator,
   Alert,
@@ -15,18 +22,33 @@ import {
   View,
 } from 'react-native';
 
-const SETTINGS_KEY = 'TRIPLE_N_SETTINGS';
-const WARDROBE_BUCKET = 'wardrobe';
+const SETTINGS_KEY =
+  'TRIPLE_N_SETTINGS';
 
-type TemperatureUnit = '°C' | '°F';
-type Occasion = 'Casual' | 'Work' | 'Date' | 'Party' | 'Sport';
+const WARDROBE_BUCKET =
+  'wardrobe';
+
+type TemperatureUnit =
+  | '°C'
+  | '°F';
+
+type Occasion =
+  | 'Casual'
+  | 'Work'
+  | 'Date'
+  | 'Party'
+  | 'Sport';
+
 type StylePreference =
   | 'Minimal'
   | 'Classic'
   | 'Streetwear'
   | 'Sport'
   | 'Luxury';
-type Language = 'English' | 'Arabic';
+
+type Language =
+  | 'English'
+  | 'Italian';
 
 type AppSettings = {
   notifications: boolean;
@@ -36,7 +58,8 @@ type AppSettings = {
   stylePreference: StylePreference;
 };
 
-const DEFAULT_SETTINGS: AppSettings = {
+const DEFAULT_SETTINGS:
+  AppSettings = {
   notifications: true,
   temperature: '°C',
   occasion: 'Casual',
@@ -45,40 +68,110 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification:
+    async () => ({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
 });
 
 export default function SettingsScreen() {
-  const [notifications, setNotifications] = useState(true);
-  const [temperature, setTemperature] =
-    useState<TemperatureUnit>('°C');
-  const [occasion, setOccasion] = useState<Occasion>('Casual');
-  const [language, setLanguage] = useState<Language>('English');
-  const [stylePreference, setStylePreference] =
-    useState<StylePreference>('Minimal');
+  const {
+    t,
+    language: currentLanguage,
+    changeLanguage,
+  } = useTranslation();
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [resetting, setResetting] = useState(false);
+  const [
+    notifications,
+    setNotifications,
+  ] = useState(true);
+
+  const [
+    temperature,
+    setTemperature,
+  ] =
+    useState<TemperatureUnit>(
+      '°C'
+    );
+
+  const [
+    occasion,
+    setOccasion,
+  ] =
+    useState<Occasion>(
+      'Casual'
+    );
+
+  const [
+    language,
+    setLanguage,
+  ] =
+    useState<Language>(
+      'English'
+    );
+
+  const [
+    stylePreference,
+    setStylePreference,
+  ] =
+    useState<StylePreference>(
+      'Minimal'
+    );
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    saving,
+    setSaving,
+  ] = useState(false);
+
+  const [
+    resetting,
+    setResetting,
+  ] = useState(false);
 
   useEffect(() => {
-    loadSettings();
+    void loadSettings();
   }, []);
 
-  function applySettings(settings: AppSettings) {
-    setNotifications(settings.notifications);
-    setTemperature(settings.temperature);
-    setOccasion(settings.occasion);
-    setLanguage(settings.language);
-    setStylePreference(settings.stylePreference);
+  useEffect(() => {
+    setLanguage(
+      currentLanguage
+    );
+  }, [currentLanguage]);
+
+  function applySettings(
+    settings: AppSettings
+  ) {
+    setNotifications(
+      settings.notifications
+    );
+
+    setTemperature(
+      settings.temperature
+    );
+
+    setOccasion(
+      settings.occasion
+    );
+
+    setLanguage(
+      settings.language
+    );
+
+    setStylePreference(
+      settings.stylePreference
+    );
   }
 
-  function getCurrentSettings(): AppSettings {
+  function getCurrentSettings():
+    AppSettings {
     return {
       notifications,
       temperature,
@@ -88,74 +181,205 @@ export default function SettingsScreen() {
     };
   }
 
+  function translateOccasion(
+    value: Occasion
+  ) {
+    switch (value) {
+      case 'Work':
+        return t(
+          'settings.valueWork'
+        );
+
+      case 'Date':
+        return t(
+          'settings.valueDate'
+        );
+
+      case 'Party':
+        return t(
+          'settings.valueParty'
+        );
+
+      case 'Sport':
+        return t(
+          'settings.valueSport'
+        );
+
+      case 'Casual':
+      default:
+        return t(
+          'settings.valueCasual'
+        );
+    }
+  }
+
+  function translateStyle(
+    value: StylePreference
+  ) {
+    switch (value) {
+      case 'Classic':
+        return t(
+          'settings.valueClassic'
+        );
+
+      case 'Streetwear':
+        return t(
+          'settings.valueStreetwear'
+        );
+
+      case 'Sport':
+        return t(
+          'settings.valueSport'
+        );
+
+      case 'Luxury':
+        return t(
+          'settings.valueLuxury'
+        );
+
+      case 'Minimal':
+      default:
+        return t(
+          'settings.valueMinimal'
+        );
+    }
+  }
+
+  function translateLanguage(
+    value: Language
+  ) {
+    return value ===
+      'Italian'
+      ? t(
+          'settings.valueItalian'
+        )
+      : t(
+          'settings.valueEnglish'
+        );
+  }
+
   async function loadSettings() {
     try {
-      const { data, error } = await supabase.auth.getSession();
+      const {
+        data,
+        error,
+      } =
+        await supabase.auth.getSession();
 
       if (error) {
         throw error;
       }
 
-      const user = data.session?.user;
+      const user =
+        data.session?.user;
 
       if (!user) {
-        router.replace('/login' as any);
+        router.replace(
+          '/login' as any
+        );
+
         return;
       }
 
-      const localValue = await AsyncStorage.getItem(SETTINGS_KEY);
+      const localValue =
+        await AsyncStorage.getItem(
+          SETTINGS_KEY
+        );
 
       if (localValue) {
-        const localSettings = JSON.parse(localValue) as Partial<AppSettings>;
+        const localSettings =
+          JSON.parse(
+            localValue
+          ) as Partial<AppSettings>;
 
         applySettings({
           ...DEFAULT_SETTINGS,
           ...localSettings,
+
+          language:
+            localSettings.language ===
+            'Italian'
+              ? 'Italian'
+              : 'English',
         });
       }
 
-      const meta = user.user_metadata || {};
+      const meta =
+        user.user_metadata ||
+        {};
 
-      const cloudSettings: AppSettings = {
+      const cloudSettings:
+        AppSettings = {
         notifications:
-          typeof meta.notifications === 'boolean'
+          typeof meta.notifications ===
+          'boolean'
             ? meta.notifications
             : DEFAULT_SETTINGS.notifications,
 
         temperature:
-          meta.temperature === '°F' ? '°F' : '°C',
+          meta.temperature ===
+          '°F'
+            ? '°F'
+            : '°C',
 
         occasion:
-          ['Casual', 'Work', 'Date', 'Party', 'Sport'].includes(
+          [
+            'Casual',
+            'Work',
+            'Date',
+            'Party',
+            'Sport',
+          ].includes(
             meta.occasion
           )
             ? meta.occasion
             : DEFAULT_SETTINGS.occasion,
 
         language:
-          meta.language === 'Arabic' ? 'Arabic' : 'English',
+          meta.language ===
+          'Italian'
+            ? 'Italian'
+            : 'English',
 
-        stylePreference: [
-          'Minimal',
-          'Classic',
-          'Streetwear',
-          'Sport',
-          'Luxury',
-        ].includes(meta.stylePreference)
-          ? meta.stylePreference
-          : DEFAULT_SETTINGS.stylePreference,
+        stylePreference:
+          [
+            'Minimal',
+            'Classic',
+            'Streetwear',
+            'Sport',
+            'Luxury',
+          ].includes(
+            meta.stylePreference
+          )
+            ? meta.stylePreference
+            : DEFAULT_SETTINGS.stylePreference,
       };
 
-      applySettings(cloudSettings);
+      applySettings(
+        cloudSettings
+      );
 
       await AsyncStorage.setItem(
         SETTINGS_KEY,
-        JSON.stringify(cloudSettings)
+        JSON.stringify(
+          cloudSettings
+        )
       );
-    } catch (error: any) {
+
+      await changeLanguage(
+        cloudSettings.language
+      );
+    } catch (
+      error: any
+    ) {
       Alert.alert(
-        'Error',
-        error?.message || 'Could not load settings.'
+        t(
+          'common.error'
+        ),
+        error?.message ||
+          t(
+            'settings.loadFailed'
+          )
       );
     } finally {
       setLoading(false);
@@ -163,11 +387,16 @@ export default function SettingsScreen() {
   }
 
   async function enableDailyNotification() {
-    const permission = await Notifications.requestPermissionsAsync();
+    const permission =
+      await Notifications.requestPermissionsAsync();
 
-    if (!permission.granted) {
+    if (
+      !permission.granted
+    ) {
       throw new Error(
-        'Notification permission was not granted. Enable it from your phone settings.'
+        t(
+          'permission.notifications'
+        )
       );
     }
 
@@ -175,12 +404,25 @@ export default function SettingsScreen() {
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Triple N Outfit Reminder 👕',
-        body: 'Your outfit of the day is ready.',
+        title:
+          t(
+            'notification.outfitTitle'
+          ),
+
+        body:
+          t(
+            'notification.outfitBody'
+          ),
+
         sound: true,
       },
+
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        type:
+          Notifications
+            .SchedulableTriggerInputTypes
+            .DAILY,
+
         hour: 8,
         minute: 0,
       },
@@ -192,14 +434,22 @@ export default function SettingsScreen() {
   }
 
   async function saveSettings() {
-    if (saving) return;
+    if (
+      saving ||
+      resetting
+    ) {
+      return;
+    }
 
     setSaving(true);
 
     try {
-      const settings = getCurrentSettings();
+      const settings =
+        getCurrentSettings();
 
-      if (settings.notifications) {
+      if (
+        settings.notifications
+      ) {
         await enableDailyNotification();
       } else {
         await disableNotifications();
@@ -207,22 +457,48 @@ export default function SettingsScreen() {
 
       await AsyncStorage.setItem(
         SETTINGS_KEY,
-        JSON.stringify(settings)
+        JSON.stringify(
+          settings
+        )
       );
 
-      const { error } = await supabase.auth.updateUser({
-        data: settings,
-      });
+      const {
+        error,
+      } =
+        await supabase.auth.updateUser(
+          {
+            data: settings,
+          }
+        );
 
       if (error) {
         throw error;
       }
 
-      Alert.alert('Saved', 'Settings updated successfully.');
-    } catch (error: any) {
+      await changeLanguage(
+        settings.language
+      );
+
       Alert.alert(
-        'Error',
-        error?.message || 'Could not save settings.'
+        t(
+          'settings.savedTitle'
+        ),
+        settings.language ===
+          'Italian'
+          ? 'Impostazioni aggiornate correttamente.'
+          : 'Settings updated successfully.'
+      );
+    } catch (
+      error: any
+    ) {
+      Alert.alert(
+        t(
+          'common.error'
+        ),
+        error?.message ||
+          t(
+            'settings.saveFailed'
+          )
       );
     } finally {
       setSaving(false);
@@ -231,31 +507,68 @@ export default function SettingsScreen() {
 
   function chooseOccasion() {
     Alert.alert(
-      'Default Occasion',
-      'Choose your default outfit style',
+      t(
+        'settings.defaultOccasion'
+      ),
+      t(
+        'settings.occasionDialog'
+      ),
       [
         {
-          text: 'Casual',
-          onPress: () => setOccasion('Casual'),
+          text:
+            t(
+              'settings.valueCasual'
+            ),
+          onPress: () =>
+            setOccasion(
+              'Casual'
+            ),
         },
         {
-          text: 'Work',
-          onPress: () => setOccasion('Work'),
+          text:
+            t(
+              'settings.valueWork'
+            ),
+          onPress: () =>
+            setOccasion(
+              'Work'
+            ),
         },
         {
-          text: 'Date',
-          onPress: () => setOccasion('Date'),
+          text:
+            t(
+              'settings.valueDate'
+            ),
+          onPress: () =>
+            setOccasion(
+              'Date'
+            ),
         },
         {
-          text: 'Party',
-          onPress: () => setOccasion('Party'),
+          text:
+            t(
+              'settings.valueParty'
+            ),
+          onPress: () =>
+            setOccasion(
+              'Party'
+            ),
         },
         {
-          text: 'Sport',
-          onPress: () => setOccasion('Sport'),
+          text:
+            t(
+              'settings.valueSport'
+            ),
+          onPress: () =>
+            setOccasion(
+              'Sport'
+            ),
         },
         {
-          text: 'Cancel',
+          text:
+            t(
+              'common.cancel'
+            ),
           style: 'cancel',
         },
       ]
@@ -264,31 +577,68 @@ export default function SettingsScreen() {
 
   function chooseStylePreference() {
     Alert.alert(
-      'Style Preference',
-      'Choose your favorite fashion style',
+      t(
+        'settings.stylePreference'
+      ),
+      t(
+        'settings.styleDialog'
+      ),
       [
         {
-          text: 'Minimal',
-          onPress: () => setStylePreference('Minimal'),
+          text:
+            t(
+              'settings.valueMinimal'
+            ),
+          onPress: () =>
+            setStylePreference(
+              'Minimal'
+            ),
         },
         {
-          text: 'Classic',
-          onPress: () => setStylePreference('Classic'),
+          text:
+            t(
+              'settings.valueClassic'
+            ),
+          onPress: () =>
+            setStylePreference(
+              'Classic'
+            ),
         },
         {
-          text: 'Streetwear',
-          onPress: () => setStylePreference('Streetwear'),
+          text:
+            t(
+              'settings.valueStreetwear'
+            ),
+          onPress: () =>
+            setStylePreference(
+              'Streetwear'
+            ),
         },
         {
-          text: 'Sport',
-          onPress: () => setStylePreference('Sport'),
+          text:
+            t(
+              'settings.valueSport'
+            ),
+          onPress: () =>
+            setStylePreference(
+              'Sport'
+            ),
         },
         {
-          text: 'Luxury',
-          onPress: () => setStylePreference('Luxury'),
+          text:
+            t(
+              'settings.valueLuxury'
+            ),
+          onPress: () =>
+            setStylePreference(
+              'Luxury'
+            ),
         },
         {
-          text: 'Cancel',
+          text:
+            t(
+              'common.cancel'
+            ),
           style: 'cancel',
         },
       ]
@@ -296,121 +646,257 @@ export default function SettingsScreen() {
   }
 
   function chooseLanguage() {
-    Alert.alert('Language', 'Choose app language', [
-      {
-        text: 'English',
-        onPress: () => setLanguage('English'),
-      },
-      {
-        text: 'العربية',
-        onPress: () => setLanguage('Arabic'),
-      },
-      {
-        text: 'Cancel',
-        style: 'cancel',
-      },
-    ]);
+    Alert.alert(
+      t(
+        'settings.language'
+      ),
+      t(
+        'settings.languageDialog'
+      ),
+      [
+        {
+          text:
+            t(
+              'settings.valueEnglish'
+            ),
+          onPress: () =>
+            setLanguage(
+              'English'
+            ),
+        },
+        {
+          text:
+            t(
+              'settings.valueItalian'
+            ),
+          onPress: () =>
+            setLanguage(
+              'Italian'
+            ),
+        },
+        {
+          text:
+            t(
+              'common.cancel'
+            ),
+          style: 'cancel',
+        },
+      ]
+    );
   }
 
-  function extractStoragePath(imageUrl?: string | null) {
-    if (!imageUrl) return null;
-
-    const marker = `/storage/v1/object/public/${WARDROBE_BUCKET}/`;
-    const markerIndex = imageUrl.indexOf(marker);
-
-    if (markerIndex === -1) {
+  function extractStoragePath(
+    imageUrl?:
+      | string
+      | null
+  ) {
+    if (!imageUrl) {
       return null;
     }
 
-    const path = imageUrl.slice(markerIndex + marker.length);
+    const marker =
+      `/storage/v1/object/public/${WARDROBE_BUCKET}/`;
 
-    return decodeURIComponent(path.split('?')[0]);
+    const markerIndex =
+      imageUrl.indexOf(
+        marker
+      );
+
+    if (
+      markerIndex === -1
+    ) {
+      return null;
+    }
+
+    const path =
+      imageUrl.slice(
+        markerIndex +
+          marker.length
+      );
+
+    return decodeURIComponent(
+      path.split('?')[0]
+    );
   }
 
   async function performReset() {
-    if (resetting) return;
+    if (
+      resetting ||
+      saving
+    ) {
+      return;
+    }
 
     setResetting(true);
 
     try {
       const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+        data: {
+          user,
+        },
+        error:
+          userError,
+      } =
+        await supabase.auth.getUser();
 
       if (userError) {
         throw userError;
       }
 
       if (!user) {
-        router.replace('/login' as any);
+        router.replace(
+          '/login' as any
+        );
+
         return;
       }
 
-      const { data: wardrobeItems, error: wardrobeReadError } =
+      const {
+        data:
+          wardrobeItems,
+        error:
+          wardrobeReadError,
+      } =
         await supabase
-          .from('wardrobe_items')
+          .from(
+            'wardrobe_items'
+          )
           .select('image')
-          .eq('user_id', user.id);
+          .eq(
+            'user_id',
+            user.id
+          );
 
-      if (wardrobeReadError) {
+      if (
+        wardrobeReadError
+      ) {
         throw wardrobeReadError;
       }
 
-      const storagePaths = (wardrobeItems || [])
-        .map((item) => extractStoragePath(item.image))
-        .filter((path): path is string => Boolean(path));
+      const storagePaths =
+        (
+          wardrobeItems ||
+          []
+        )
+          .map(
+            (item) =>
+              extractStoragePath(
+                item.image
+              )
+          )
+          .filter(
+            (
+              path
+            ): path is string =>
+              Boolean(path)
+          );
 
-      if (storagePaths.length > 0) {
-        const { error: storageError } = await supabase.storage
-          .from(WARDROBE_BUCKET)
-          .remove(storagePaths);
+      if (
+        storagePaths.length >
+        0
+      ) {
+        const {
+          error:
+            storageError,
+        } =
+          await supabase.storage
+            .from(
+              WARDROBE_BUCKET
+            )
+            .remove(
+              storagePaths
+            );
 
         if (storageError) {
           throw storageError;
         }
       }
 
-      const { error: outfitsError } = await supabase
-        .from('saved_outfits')
-        .delete()
-        .eq('user_id', user.id);
+      const {
+        error:
+          outfitsError,
+      } =
+        await supabase
+          .from(
+            'saved_outfits'
+          )
+          .delete()
+          .eq(
+            'user_id',
+            user.id
+          );
 
-      if (outfitsError) {
+      if (
+        outfitsError
+      ) {
         throw outfitsError;
       }
 
-      const { error: wardrobeError } = await supabase
-        .from('wardrobe_items')
-        .delete()
-        .eq('user_id', user.id);
+      const {
+        error:
+          wardrobeError,
+      } =
+        await supabase
+          .from(
+            'wardrobe_items'
+          )
+          .delete()
+          .eq(
+            'user_id',
+            user.id
+          );
 
-      if (wardrobeError) {
+      if (
+        wardrobeError
+      ) {
         throw wardrobeError;
       }
 
       await Notifications.cancelAllScheduledNotificationsAsync();
+
       await AsyncStorage.clear();
 
-      const { error: metadataError } =
-        await supabase.auth.updateUser({
-          data: {
-            ...DEFAULT_SETTINGS,
-            wardrobeType: null,
-          },
-        });
+      const {
+        error:
+          metadataError,
+      } =
+        await supabase.auth.updateUser(
+          {
+            data: {
+              ...DEFAULT_SETTINGS,
 
-      if (metadataError) {
+              wardrobeType:
+                null,
+            },
+          }
+        );
+
+      if (
+        metadataError
+      ) {
         throw metadataError;
       }
 
+      await changeLanguage(
+        'English'
+      );
+
       await supabase.auth.signOut();
 
-      router.replace('/login' as any);
-    } catch (error: any) {
+      router.replace(
+        '/login' as any
+      );
+    } catch (
+      error: any
+    ) {
       Alert.alert(
-        'Reset failed',
-        error?.message || 'Could not reset app data.'
+        t(
+          'settings.resetFailed'
+        ),
+        error?.message ||
+          t(
+            'settings.resetFailedMessage'
+          )
       );
 
       setResetting(false);
@@ -419,17 +905,29 @@ export default function SettingsScreen() {
 
   function resetAppData() {
     Alert.alert(
-      'Reset App Data',
-      'This permanently deletes your wardrobe, cleaned images, saved outfits and local settings. This cannot be undone.',
+      t(
+        'settings.reset'
+      ),
+      t(
+        'settings.resetMessage'
+      ),
       [
         {
-          text: 'Cancel',
+          text:
+            t(
+              'common.cancel'
+            ),
           style: 'cancel',
         },
         {
-          text: 'Delete Everything',
-          style: 'destructive',
-          onPress: performReset,
+          text:
+            t(
+              'settings.deleteEverything'
+            ),
+          style:
+            'destructive',
+          onPress:
+            performReset,
         },
       ]
     );
@@ -437,21 +935,50 @@ export default function SettingsScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color="#f1d8c2" />
+      <View
+        style={
+          styles.loadingScreen
+        }
+      >
+        <ActivityIndicator
+          size="large"
+          color="#f1d8c2"
+        />
+
+        <Text
+          style={
+            styles.loadingText
+          }
+        >
+          {t(
+            'common.loading'
+          )}
+        </Text>
       </View>
     );
   }
 
   return (
     <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
+      style={
+        styles.container
+      }
+      showsVerticalScrollIndicator={
+        false
+      }
     >
-      <View style={styles.content}>
+      <View
+        style={
+          styles.content
+        }
+      >
         <TouchableOpacity
-          style={styles.backIcon}
-          onPress={() => router.back()}
+          style={
+            styles.backIcon
+          }
+          onPress={() =>
+            router.back()
+          }
         >
           <Feather
             name="chevron-left"
@@ -460,72 +987,154 @@ export default function SettingsScreen() {
           />
         </TouchableOpacity>
 
-        <Text style={styles.title}>Settings</Text>
-
-        <Text style={styles.subtitle}>
-          Customize your Triple N experience
+        <Text
+          style={
+            styles.title
+          }
+        >
+          {t(
+            'settings.title'
+          )}
         </Text>
 
-        <View style={styles.card}>
+        <Text
+          style={
+            styles.subtitle
+          }
+        >
+          {t(
+            'settings.subtitle'
+          )}
+        </Text>
+
+        <View
+          style={
+            styles.card
+          }
+        >
           <SettingSwitch
             icon="bell"
-            title="Notifications"
-            subtitle="Daily outfit reminder at 8:00 AM"
-            value={notifications}
-            onValueChange={setNotifications}
+            title={t(
+              'settings.notifications'
+            )}
+            subtitle={t(
+              'settings.notificationsSubtitle'
+            )}
+            value={
+              notifications
+            }
+            onValueChange={
+              setNotifications
+            }
           />
 
           <SettingToggle
             icon="thermometer"
-            title="Temperature"
-            subtitle="Weather outfit unit"
-            value={temperature}
+            title={t(
+              'settings.temperature'
+            )}
+            subtitle={t(
+              'settings.temperatureSubtitle'
+            )}
+            value={
+              temperature
+            }
             left="°C"
             right="°F"
-            onChange={(value) =>
-              setTemperature(value as TemperatureUnit)
+            onChange={(
+              value
+            ) =>
+              setTemperature(
+                value as TemperatureUnit
+              )
             }
           />
 
           <SettingRow
             icon="briefcase"
-            title="Default Occasion"
-            subtitle="Your usual outfit style"
-            value={occasion}
-            onPress={chooseOccasion}
+            title={t(
+              'settings.defaultOccasion'
+            )}
+            subtitle={t(
+              'settings.occasionSubtitle'
+            )}
+            value={translateOccasion(
+              occasion
+            )}
+            onPress={
+              chooseOccasion
+            }
           />
 
           <SettingRow
             icon="star"
-            title="Style Preference"
-            subtitle="Your favorite fashion style"
-            value={stylePreference}
-            onPress={chooseStylePreference}
+            title={t(
+              'settings.stylePreference'
+            )}
+            subtitle={t(
+              'settings.styleSubtitle'
+            )}
+            value={translateStyle(
+              stylePreference
+            )}
+            onPress={
+              chooseStylePreference
+            }
           />
 
           <SettingRow
             icon="globe"
-            title="Language"
-            subtitle="App display language"
-            value={language}
-            onPress={chooseLanguage}
+            title={t(
+              'settings.language'
+            )}
+            subtitle={t(
+              'settings.languageSubtitle'
+            )}
+            value={translateLanguage(
+              language
+            )}
+            onPress={
+              chooseLanguage
+            }
           />
         </View>
 
         <TouchableOpacity
           style={[
             styles.saveButton,
-            saving && styles.disabledButton,
+
+            saving &&
+              styles.disabledButton,
           ]}
-          onPress={saveSettings}
-          disabled={saving || resetting}
+          onPress={
+            saveSettings
+          }
+          disabled={
+            saving ||
+            resetting
+          }
         >
           {saving ? (
-            <ActivityIndicator color="#111" />
+            <ActivityIndicator
+              color="#111"
+            />
           ) : (
             <>
-              <Feather name="check" size={21} color="#111" />
-              <Text style={styles.saveText}>Save Settings</Text>
+              <Feather
+                name="check"
+                size={21}
+                color="#111"
+              />
+
+              <Text
+                style={
+                  styles.saveText
+                }
+              >
+                {t(
+                  'settings.save'
+                )}
+              </Text>
             </>
           )}
         </TouchableOpacity>
@@ -533,13 +1142,22 @@ export default function SettingsScreen() {
         <TouchableOpacity
           style={[
             styles.resetButton,
-            resetting && styles.disabledButton,
+
+            resetting &&
+              styles.disabledButton,
           ]}
-          onPress={resetAppData}
-          disabled={resetting || saving}
+          onPress={
+            resetAppData
+          }
+          disabled={
+            resetting ||
+            saving
+          }
         >
           {resetting ? (
-            <ActivityIndicator color="#ff5a5a" />
+            <ActivityIndicator
+              color="#ff5a5a"
+            />
           ) : (
             <>
               <Feather
@@ -547,8 +1165,15 @@ export default function SettingsScreen() {
                 size={20}
                 color="#ff5a5a"
               />
-              <Text style={styles.resetText}>
-                Reset App Data
+
+              <Text
+                style={
+                  styles.resetText
+                }
+              >
+                {t(
+                  'settings.reset'
+                )}
               </Text>
             </>
           )}
@@ -565,33 +1190,80 @@ function SettingSwitch({
   value,
   onValueChange,
 }: {
-  icon: any;
+  icon:
+    React.ComponentProps<
+      typeof Feather
+    >['name'];
+
   title: string;
   subtitle: string;
   value: boolean;
-  onValueChange: (value: boolean) => void;
+
+  onValueChange:
+    (
+      value: boolean
+    ) => void;
 }) {
   return (
-    <View style={styles.settingItem}>
-      <View style={styles.settingLeft}>
-        <View style={styles.iconBox}>
-          <Feather name={icon} size={20} color="#f1d8c2" />
+    <View
+      style={
+        styles.settingItem
+      }
+    >
+      <View
+        style={
+          styles.settingLeft
+        }
+      >
+        <View
+          style={
+            styles.iconBox
+          }
+        >
+          <Feather
+            name={icon}
+            size={20}
+            color="#f1d8c2"
+          />
         </View>
 
-        <View style={styles.textBox}>
-          <Text style={styles.settingTitle}>{title}</Text>
-          <Text style={styles.settingSubtitle}>{subtitle}</Text>
+        <View
+          style={
+            styles.textBox
+          }
+        >
+          <Text
+            style={
+              styles.settingTitle
+            }
+          >
+            {title}
+          </Text>
+
+          <Text
+            style={
+              styles.settingSubtitle
+            }
+          >
+            {subtitle}
+          </Text>
         </View>
       </View>
 
       <Switch
         value={value}
-        onValueChange={onValueChange}
+        onValueChange={
+          onValueChange
+        }
         trackColor={{
           false: '#333740',
           true: '#f1d8c2',
         }}
-        thumbColor={value ? '#111' : '#888'}
+        thumbColor={
+          value
+            ? '#111'
+            : '#888'
+        }
       />
     </View>
   );
@@ -606,39 +1278,90 @@ function SettingToggle({
   right,
   onChange,
 }: {
-  icon: any;
+  icon:
+    React.ComponentProps<
+      typeof Feather
+    >['name'];
+
   title: string;
   subtitle: string;
   value: string;
   left: string;
   right: string;
-  onChange: (value: string) => void;
+
+  onChange:
+    (
+      value: string
+    ) => void;
 }) {
   return (
-    <View style={styles.settingItemColumn}>
-      <View style={styles.settingLeft}>
-        <View style={styles.iconBox}>
-          <Feather name={icon} size={20} color="#f1d8c2" />
+    <View
+      style={
+        styles.settingItemColumn
+      }
+    >
+      <View
+        style={
+          styles.settingLeft
+        }
+      >
+        <View
+          style={
+            styles.iconBox
+          }
+        >
+          <Feather
+            name={icon}
+            size={20}
+            color="#f1d8c2"
+          />
         </View>
 
-        <View style={styles.textBox}>
-          <Text style={styles.settingTitle}>{title}</Text>
-          <Text style={styles.settingSubtitle}>{subtitle}</Text>
+        <View
+          style={
+            styles.textBox
+          }
+        >
+          <Text
+            style={
+              styles.settingTitle
+            }
+          >
+            {title}
+          </Text>
+
+          <Text
+            style={
+              styles.settingSubtitle
+            }
+          >
+            {subtitle}
+          </Text>
         </View>
       </View>
 
-      <View style={styles.segment}>
+      <View
+        style={
+          styles.segment
+        }
+      >
         <TouchableOpacity
           style={[
             styles.segmentButton,
-            value === left && styles.segmentButtonActive,
+
+            value === left &&
+              styles.segmentButtonActive,
           ]}
-          onPress={() => onChange(left)}
+          onPress={() =>
+            onChange(left)
+          }
         >
           <Text
             style={[
               styles.segmentText,
-              value === left && styles.segmentTextActive,
+
+              value === left &&
+                styles.segmentTextActive,
             ]}
           >
             {left}
@@ -648,14 +1371,20 @@ function SettingToggle({
         <TouchableOpacity
           style={[
             styles.segmentButton,
-            value === right && styles.segmentButtonActive,
+
+            value === right &&
+              styles.segmentButtonActive,
           ]}
-          onPress={() => onChange(right)}
+          onPress={() =>
+            onChange(right)
+          }
         >
           <Text
             style={[
               styles.segmentText,
-              value === right && styles.segmentTextActive,
+
+              value === right &&
+                styles.segmentTextActive,
             ]}
           >
             {right}
@@ -673,7 +1402,11 @@ function SettingRow({
   value,
   onPress,
 }: {
-  icon: any;
+  icon:
+    React.ComponentProps<
+      typeof Feather
+    >['name'];
+
   title: string;
   subtitle: string;
   value: string;
@@ -681,22 +1414,69 @@ function SettingRow({
 }) {
   return (
     <TouchableOpacity
-      style={styles.settingItem}
-      onPress={onPress}
+      style={
+        styles.settingItem
+      }
+      onPress={
+        onPress
+      }
+      activeOpacity={
+        0.85
+      }
     >
-      <View style={styles.settingLeft}>
-        <View style={styles.iconBox}>
-          <Feather name={icon} size={20} color="#f1d8c2" />
+      <View
+        style={
+          styles.settingLeft
+        }
+      >
+        <View
+          style={
+            styles.iconBox
+          }
+        >
+          <Feather
+            name={icon}
+            size={20}
+            color="#f1d8c2"
+          />
         </View>
 
-        <View style={styles.textBox}>
-          <Text style={styles.settingTitle}>{title}</Text>
-          <Text style={styles.settingSubtitle}>{subtitle}</Text>
+        <View
+          style={
+            styles.textBox
+          }
+        >
+          <Text
+            style={
+              styles.settingTitle
+            }
+          >
+            {title}
+          </Text>
+
+          <Text
+            style={
+              styles.settingSubtitle
+            }
+          >
+            {subtitle}
+          </Text>
         </View>
       </View>
 
-      <View style={styles.settingRight}>
-        <Text style={styles.valueText}>{value}</Text>
+      <View
+        style={
+          styles.settingRight
+        }
+      >
+        <Text
+          style={
+            styles.valueText
+          }
+        >
+          {value}
+        </Text>
+
         <Feather
           name="chevron-right"
           size={22}
@@ -707,188 +1487,216 @@ function SettingRow({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#07090d',
-  },
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor:
+        '#07090d',
+    },
 
-  loadingScreen: {
-    flex: 1,
-    backgroundColor: '#07090d',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    loadingScreen: {
+      flex: 1,
+      backgroundColor:
+        '#07090d',
+      alignItems: 'center',
+      justifyContent:
+        'center',
+    },
 
-  content: {
-    padding: 24,
-    paddingTop: 62,
-    paddingBottom: 45,
-  },
+    loadingText: {
+      color: '#aaa',
+      fontSize: 14,
+      fontWeight: '700',
+      marginTop: 12,
+    },
 
-  backIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#17191d',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 18,
-  },
+    content: {
+      padding: 24,
+      paddingTop: 62,
+      paddingBottom: 45,
+    },
 
-  title: {
-    color: 'white',
-    fontSize: 34,
-    fontWeight: '900',
-    marginBottom: 6,
-  },
+    backIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor:
+        '#17191d',
+      alignItems: 'center',
+      justifyContent:
+        'center',
+      marginBottom: 18,
+    },
 
-  subtitle: {
-    color: '#8f9299',
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 24,
-  },
+    title: {
+      color: 'white',
+      fontSize: 34,
+      fontWeight: '900',
+      marginBottom: 6,
+    },
 
-  card: {
-    backgroundColor: '#111318',
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: '#22252b',
-    overflow: 'hidden',
-  },
+    subtitle: {
+      color: '#8f9299',
+      fontSize: 15,
+      fontWeight: '700',
+      marginBottom: 24,
+    },
 
-  settingItem: {
-    minHeight: 78,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#22252b',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+    card: {
+      backgroundColor:
+        '#111318',
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor:
+        '#22252b',
+      overflow: 'hidden',
+    },
 
-  settingItemColumn: {
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#22252b',
-  },
+    settingItem: {
+      minHeight: 78,
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor:
+        '#22252b',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent:
+        'space-between',
+    },
 
-  settingLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
+    settingItemColumn: {
+      paddingHorizontal: 18,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor:
+        '#22252b',
+    },
 
-  textBox: {
-    flex: 1,
-  },
+    settingLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
 
-  iconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 16,
-    backgroundColor: '#1b1e24',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
+    textBox: {
+      flex: 1,
+    },
 
-  settingTitle: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '900',
-  },
+    iconBox: {
+      width: 42,
+      height: 42,
+      borderRadius: 16,
+      backgroundColor:
+        '#1b1e24',
+      alignItems: 'center',
+      justifyContent:
+        'center',
+      marginRight: 14,
+    },
 
-  settingSubtitle: {
-    color: '#858995',
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 4,
-  },
+    settingTitle: {
+      color: 'white',
+      fontSize: 16,
+      fontWeight: '900',
+    },
 
-  settingRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
+    settingSubtitle: {
+      color: '#858995',
+      fontSize: 12,
+      fontWeight: '700',
+      marginTop: 4,
+    },
 
-  valueText: {
-    color: '#f1d8c2',
-    fontSize: 14,
-    fontWeight: '900',
-    marginRight: 6,
-  },
+    settingRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginLeft: 8,
+    },
 
-  segment: {
-    height: 44,
-    backgroundColor: '#1b1e24',
-    borderRadius: 16,
-    flexDirection: 'row',
-    padding: 4,
-    marginTop: 16,
-  },
+    valueText: {
+      color: '#f1d8c2',
+      fontSize: 14,
+      fontWeight: '900',
+      marginRight: 6,
+    },
 
-  segmentButton: {
-    flex: 1,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    segment: {
+      height: 44,
+      backgroundColor:
+        '#1b1e24',
+      borderRadius: 16,
+      flexDirection: 'row',
+      padding: 4,
+      marginTop: 16,
+    },
 
-  segmentButtonActive: {
-    backgroundColor: '#f1d8c2',
-  },
+    segmentButton: {
+      flex: 1,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent:
+        'center',
+    },
 
-  segmentText: {
-    color: '#888',
-    fontSize: 15,
-    fontWeight: '900',
-  },
+    segmentButtonActive: {
+      backgroundColor:
+        '#f1d8c2',
+    },
 
-  segmentTextActive: {
-    color: '#111',
-  },
+    segmentText: {
+      color: '#888',
+      fontSize: 15,
+      fontWeight: '900',
+    },
 
-  saveButton: {
-    height: 58,
-    borderRadius: 22,
-    backgroundColor: '#f1d8c2',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    marginTop: 22,
-  },
+    segmentTextActive: {
+      color: '#111',
+    },
 
-  saveText: {
-    color: '#111',
-    fontSize: 17,
-    fontWeight: '900',
-    marginLeft: 10,
-  },
+    saveButton: {
+      height: 58,
+      borderRadius: 22,
+      backgroundColor:
+        '#f1d8c2',
+      alignItems: 'center',
+      justifyContent:
+        'center',
+      flexDirection: 'row',
+      marginTop: 22,
+    },
 
-  resetButton: {
-    height: 58,
-    borderRadius: 22,
-    backgroundColor: '#17191d',
-    borderWidth: 1,
-    borderColor: '#2a2d35',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    marginTop: 14,
-  },
+    saveText: {
+      color: '#111',
+      fontSize: 17,
+      fontWeight: '900',
+      marginLeft: 10,
+    },
 
-  resetText: {
-    color: '#ff5a5a',
-    fontSize: 16,
-    fontWeight: '900',
-    marginLeft: 10,
-  },
+    resetButton: {
+      height: 58,
+      borderRadius: 22,
+      backgroundColor:
+        '#17191d',
+      borderWidth: 1,
+      borderColor:
+        '#2a2d35',
+      alignItems: 'center',
+      justifyContent:
+        'center',
+      flexDirection: 'row',
+      marginTop: 14,
+    },
 
-  disabledButton: {
-    opacity: 0.55,
-  },
-});
+    resetText: {
+      color: '#ff5a5a',
+      fontSize: 16,
+      fontWeight: '900',
+      marginLeft: 10,
+    },
+
+    disabledButton: {
+      opacity: 0.55,
+    },
+  });

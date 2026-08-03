@@ -1,5 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
+
 import {
   Alert,
   ScrollView,
@@ -10,23 +11,53 @@ import {
   View,
 } from 'react-native';
 
+import {
+  useTranslation,
+} from '@/lib/i18n';
+
 export default function AboutScreen() {
+  const { t } = useTranslation();
+
   async function shareApp() {
-    await Share.share({
-      message:
-        'Check out Triple N — AI Fashion Assistant.\nDownload coming soon.',
-    });
+    try {
+      await Share.share({
+        message: t(
+          'about.shareMessage'
+        ),
+      });
+    } catch {
+      Alert.alert(
+        t('common.error'),
+        t('about.shareError')
+      );
+    }
+  }
+
+  function showRateAlert() {
+    Alert.alert(
+      t('about.comingSoonTitle'),
+      t('about.ratingComingSoon')
+    );
   }
 
   return (
     <ScrollView
       style={styles.container}
-      showsVerticalScrollIndicator={false}
+      showsVerticalScrollIndicator={
+        false
+      }
     >
       <View style={styles.content}>
         <TouchableOpacity
           style={styles.backIcon}
-          onPress={() => router.back()}
+          onPress={() =>
+            router.back()
+          }
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={t(
+            'common.back'
+          )}
         >
           <Feather
             name="chevron-left"
@@ -37,7 +68,11 @@ export default function AboutScreen() {
 
         <View style={styles.heroCard}>
           <View style={styles.logoCircle}>
-            <Text style={styles.logoLetter}>N</Text>
+            <Text
+              style={styles.logoLetter}
+            >
+              N
+            </Text>
           </View>
 
           <Text style={styles.appName}>
@@ -45,12 +80,16 @@ export default function AboutScreen() {
           </Text>
 
           <Text style={styles.tagline}>
-            Your Personal Fashion Assistant
+            {t('about.tagline')}
           </Text>
 
-          <View style={styles.versionBadge}>
-            <Text style={styles.versionText}>
-              Version 1.0.0 Production
+          <View
+            style={styles.versionBadge}
+          >
+            <Text
+              style={styles.versionText}
+            >
+              {t('about.version')}
             </Text>
           </View>
         </View>
@@ -58,46 +97,76 @@ export default function AboutScreen() {
         <View style={styles.card}>
           <InfoItem
             icon="zap"
-            title="Smart Styling"
-            text="Triple N helps you build better outfits from the clothes you already own."
+            title={t(
+              'about.smartStylingTitle'
+            )}
+            text={t(
+              'about.smartStylingText'
+            )}
           />
 
           <InfoItem
             icon="cpu"
-            title="AI Assistant"
-            text="The app suggests outfits based on categories, colors, weather, seasons and occasions."
+            title={t(
+              'about.aiAssistantTitle'
+            )}
+            text={t(
+              'about.aiAssistantText'
+            )}
           />
 
           <InfoItem
             icon="shield"
-            title="Private by Design"
-            text="Your wardrobe is securely stored in the cloud and synced across your devices."
+            title={t(
+              'about.privacyTitle'
+            )}
+            text={t(
+              'about.privacyText'
+            )}
+            showBorder={false}
           />
         </View>
 
-        <View style={styles.statementCard}>
-          <Text style={styles.statementTitle}>
-            Our Mission
+        <View
+          style={styles.statementCard}
+        >
+          <Text
+            style={styles.statementTitle}
+          >
+            {t('about.missionTitle')}
           </Text>
 
-          <Text style={styles.statementText}>
-            To make choosing outfits faster, smarter and more personal every day.
+          <Text
+            style={styles.statementText}
+          >
+            {t('about.missionText')}
           </Text>
         </View>
 
-        <View style={styles.statementCard}>
-          <Text style={styles.statementTitle}>
-            Our Vision
+        <View
+          style={styles.statementCard}
+        >
+          <Text
+            style={styles.statementTitle}
+          >
+            {t('about.visionTitle')}
           </Text>
 
-          <Text style={styles.statementText}>
-            To become the world's most trusted AI fashion assistant.
+          <Text
+            style={styles.statementText}
+          >
+            {t('about.visionText')}
           </Text>
         </View>
 
         <TouchableOpacity
           style={styles.actionButton}
           onPress={shareApp}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={t(
+            'about.shareApp'
+          )}
         >
           <Feather
             name="share-2"
@@ -106,18 +175,18 @@ export default function AboutScreen() {
           />
 
           <Text style={styles.actionText}>
-            Share Triple N
+            {t('about.shareApp')}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.secondaryButton}
-          onPress={() =>
-            Alert.alert(
-              'Coming Soon',
-              'App Store & Google Play rating will be available after launch.'
-            )
-          }
+          onPress={showRateAlert}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={t(
+            'about.rateApp'
+          )}
         >
           <Feather
             name="star"
@@ -125,43 +194,49 @@ export default function AboutScreen() {
             color="#f1d8c2"
           />
 
-          <Text style={styles.secondaryText}>
-            Rate App
+          <Text
+            style={styles.secondaryText}
+          >
+            {t('about.rateApp')}
           </Text>
         </TouchableOpacity>
 
         <Text style={styles.footer}>
-          Made with passion for better style.
+          {t('about.footer')}
         </Text>
 
-        <Text
-          style={{
-            color: '#555',
-            textAlign: 'center',
-            marginTop: 8,
-            fontSize: 12,
-            fontWeight: '700',
-          }}
-        >
-          © 2026 Triple N. All rights reserved.
+        <Text style={styles.copyright}>
+          {t('about.copyright')}
         </Text>
-
       </View>
     </ScrollView>
   );
 }
 
+type InfoItemProps = {
+  icon:
+    | 'zap'
+    | 'cpu'
+    | 'shield';
+  title: string;
+  text: string;
+  showBorder?: boolean;
+};
+
 function InfoItem({
   icon,
   title,
   text,
-}: {
-  icon: any;
-  title: string;
-  text: string;
-}) {
+  showBorder = true,
+}: InfoItemProps) {
   return (
-    <View style={styles.infoItem}>
+    <View
+      style={[
+        styles.infoItem,
+        !showBorder &&
+          styles.infoItemWithoutBorder,
+      ]}
+    >
       <View style={styles.iconBox}>
         <Feather
           name={icon}
@@ -170,7 +245,7 @@ function InfoItem({
         />
       </View>
 
-      <View style={{ flex: 1 }}>
+      <View style={styles.infoContent}>
         <Text style={styles.infoTitle}>
           {title}
         </Text>
@@ -182,6 +257,7 @@ function InfoItem({
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -276,6 +352,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
 
+  infoItemWithoutBorder: {
+    borderBottomWidth: 0,
+  },
+
   iconBox: {
     width: 42,
     height: 42,
@@ -284,6 +364,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
+  },
+
+  infoContent: {
+    flex: 1,
   },
 
   infoTitle: {
@@ -322,6 +406,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 21,
   },
+
   actionButton: {
     height: 58,
     borderRadius: 22,
@@ -364,5 +449,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     marginTop: 24,
+  },
+
+  copyright: {
+    color: '#555',
+    textAlign: 'center',
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

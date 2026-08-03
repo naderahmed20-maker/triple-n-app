@@ -1,0 +1,139 @@
+{
+  "templates": [
+    {
+      "id": "male-tshirt-regular",
+      "label": "T-Shirt Regular",
+      "gender": "male",
+      "category": "Tops",
+      "subCategory": "TShirt",
+      "symbolId": "tshirt-regular",
+      "viewBox": "0 0 1000 1000",
+      "aspectRatio": 1
+    },
+    {
+      "id": "male-tshirt-oversized",
+      "label": "T-Shirt Oversized",
+      "gender": "male",
+      "category": "Tops",
+      "subCategory": "TShirt",
+      "symbolId": "tshirt-oversized",
+      "viewBox": "0 0 1000 1000",
+      "aspectRatio": 1
+    },
+    {
+      "id": "male-polo-classic",
+      "label": "Polo",
+      "gender": "male",
+      "category": "Tops",
+      "subCategory": "Polo",
+      "symbolId": "polo-classic",
+      "viewBox": "0 0 1000 1000",
+      "aspectRatio": 1
+    },
+    {
+      "id": "male-shirt-short-sleeve",
+      "label": "Short Sleeve Shirt",
+      "gender": "male",
+      "category": "Tops",
+      "subCategory": "Shirt",
+      "symbolId": "shirt-short-sleeve",
+      "viewBox": "0 0 1000 1000",
+      "aspectRatio": 1
+    },
+    {
+      "id": "male-shirt-long-sleeve",
+      "label": "Long Sleeve Shirt",
+      "gender": "male",
+      "category": "Tops",
+      "subCategory": "Shirt",
+      "symbolId": "shirt-long-sleeve",
+      "viewBox": "0 0 1000 1000",
+      "aspectRatio": 1
+    },
+    {
+      "id": "male-shorts-regular",
+      "label": "Regular Shorts",
+      "gender": "male",
+      "category": "Shorts",
+      "subCategory": "Shorts",
+      "symbolId": "shorts-regular",
+      "viewBox": "0 0 1000 1000",
+      "aspectRatio": 1
+    },
+    {
+      "id": "male-shorts-long",
+      "label": "Long Shorts",
+      "gender": "male",
+      "category": "Shorts",
+      "subCategory": "Shorts",
+      "symbolId": "shorts-long",
+      "viewBox": "0 0 1000 1000",
+      "aspectRatio": 1
+    },
+    {
+      "id": "male-pants-regular",
+      "label": "Pants",
+      "gender": "male",
+      "category": "Pants",
+      "subCategory": "Pants",
+      "symbolId": "pants-regular",
+      "viewBox": "0 0 1000 1000",
+      "aspectRatio": 1
+    },
+    {
+      "id": "male-sneakers-slim",
+      "label": "Slim Sneaker",
+      "gender": "male",
+      "category": "Shoes",
+      "subCategory": "Sneakers",
+      "symbolId": "sneakers-slim",
+      "viewBox": "0 0 1000 1000",
+      "aspectRatio": 1
+    },
+    {
+      "id": "male-sneakers-regular",
+      "label": "Regular Sneaker",
+      "gender": "male",
+      "category": "Shoes",
+      "subCategory": "Sneakers",
+      "symbolId": "sneakers-regular",
+      "viewBox": "0 0 1000 1000",
+      "aspectRatio": 1
+    },
+    {
+      "id": "male-sneakers-chunky",
+      "label": "Chunky Sneaker",
+      "gender": "male",
+      "category": "Shoes",
+      "subCategory": "Sneakers",
+      "symbolId": "sneakers-chunky",
+      "viewBox": "0 0 1000 1000",
+      "aspectRatio": 1
+    },
+    {
+      "id": "male-shoes-classic-lace-up",
+      "label": "Classic Lace-Up",
+      "gender": "male",
+      "category": "Shoes",
+      "subCategory": "Shoes",
+      "symbolId": "shoes-classic-lace-up",
+      "viewBox": "0 0 1000 1000",
+      "aspectRatio": 1
+    },
+    {
+      "id": "male-shoes-loafer",
+      "label": "Loafer",
+      "gender": "male",
+      "category": "Shoes",
+      "subCategory": "Shoes",
+      "symbolId": "shoes-loafer",
+      "viewBox": "0 0 1000 1000",
+      "aspectRatio": 1
+    }
+  ],
+  "files": {
+    "mask": "mask.svg",
+    "outline": "outline.svg",
+    "cameraOutline": "camera-outline.svg"
+  }
+}

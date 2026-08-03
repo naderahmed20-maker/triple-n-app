@@ -6,370 +6,430 @@ export type OutfitCanvasVariant =
 
 export const OUTFIT_LAYOUT = {
   builder: {
-    canvas: { width: 250, height: 390 },
-
-    Jackets: {
-      top: -10,
-      left: 2,
-      width: 245,
-      height: 195,
-      zIndex: 3,
+    canvas: {
+      width: 285,
+      height: 420,
     },
 
+    /*
+     * الجاكيت:
+     * أعلى اليسار ومستقل عن التيشيرت.
+     */
+    Jackets: {
+      top: 8,
+      left: 4,
+      width: 96,
+      height: 92,
+      zIndex: 5,
+    },
+
+    /*
+     * التيشيرت:
+     * في المنتصف وفوق البنطلون.
+     */
     Tops: {
-      top: 25,
-      left: 12,
-      width: 225,
-      height: 195,
-      zIndex: 2,
-    },
-
-    Bottoms: {
-      top: 155,
-      left: 22,
-      width: 205,
-      height: 225,
-      zIndex: 1,
-    },
-
-    Dresses: {
-      top: 15,
-      left: 10,
-      width: 230,
-      height: 330,
-      zIndex: 2,
-    },
-
-    Shoes: {
-      top: 300,
-      left: 85,
-      width: 220,
-      height: 115,
-      zIndex: 4,
-    },
-
-    Watch: {
-      top: 178,
-      left: 202,
-      width: 42,
-      height: 42,
-      zIndex: 5,
-    },
-
-    Glasses: {
-      top: 10,
-      left: 96,
-      width: 58,
-      height: 36,
-      zIndex: 5,
-    },
-
-    Cap: {
-      top: 0,
-      left: 94,
-      width: 62,
-      height: 46,
-      zIndex: 5,
-    },
-
-    Bag: {
-      top: 210,
-      left: 5,
-      width: 70,
-      height: 95,
-      zIndex: 5,
-    },
-
-    Other: {
-      top: 185,
-      left: 202,
-      width: 45,
-      height: 45,
-      zIndex: 5,
-    },
-
-    Accessories: {
-      top: 185,
-      left: 202,
-      width: 45,
-      height: 45,
-      zIndex: 5,
-    },
-  },
-
-  suggestion: {
-    canvas: { width: 285, height: 430 },
-
-    Jackets: {
-      top: -5,
-      left: 8,
-      width: 270,
+      top: 40,
+      left: 50,
+      width: 200,
       height: 200,
       zIndex: 3,
     },
 
-    Tops: {
-      top: 18,
-      left: 20,
-      width: 245,
-      height: 215,
-      zIndex: 2,
-    },
-
+    /*
+     * البنطلون / الشورت:
+     * تحت التيشيرت مباشرة.
+     */
     Bottoms: {
-      top: 155,
-      left: 28,
-      width: 230,
-      height: 255,
-      zIndex: 1,
-    },
-
-    Dresses: {
-      top: 10,
-      left: 18,
-      width: 250,
-      height: 360,
+      top: 194,
+      left: 45,
+      width: 200,
+      height: 180,
       zIndex: 2,
     },
 
+    /*
+     * الفستان:
+     * في المنتصف مع مساحة للإكسسوارات.
+     */
+    Dresses: {
+      top: 58,
+      left: 58,
+      width: 172,
+      height: 315,
+      zIndex: 3,
+    },
+
+    /*
+     * الحذاء:
+     * أسفل البنطلون وفي المنتصف.
+     */
     Shoes: {
-      top: 315,
-      left: 120,
+      top: 330,
+      left: 50,
       width: 220,
-      height: 115,
-      zIndex: 4,
+      height: 100,
+      zIndex: 6,
     },
 
+    /*
+     * الساعة:
+     * يمين البنطلون.
+     */
     Watch: {
-      top: 185,
-      left: 235,
-      width: 42,
-      height: 42,
-      zIndex: 5,
+      top: 200,
+      left: 190,
+      width: 80,
+      height: 100,
+      zIndex: 7,
     },
 
+    /*
+     * النظارة:
+     * أعلى اليمين.
+     */
     Glasses: {
-      top: 10,
-      left: 112,
-      width: 62,
-      height: 36,
-      zIndex: 5,
+      top: 30,
+      left: 213,
+      width: 66,
+      height: 42,
+      zIndex: 7,
     },
 
+    /*
+     * الكاب:
+     * أعلى اليمين.
+     */
     Cap: {
-      top: 0,
-      left: 112,
-      width: 62,
-      height: 46,
-      zIndex: 5,
+      top: 8,
+      left: 160,
+      width: 150,
+      height: 100,
+      zIndex: 7,
     },
 
+    /*
+     * الشنطة:
+     * يسار البنطلون وأسفل الجاكيت.
+     */
     Bag: {
-      top: 210,
-      left: 12,
-      width: 78,
-      height: 105,
-      zIndex: 5,
+      top: 180,
+      left: -30,
+      width: 150,
+      height: 180,
+      zIndex: 7,
     },
 
+    /*
+     * أي إكسسوار آخر:
+     * يمين البنطلون.
+     */
     Other: {
-      top: 190,
-      left: 235,
-      width: 45,
-      height: 45,
-      zIndex: 5,
+      top: 254,
+      left: 238,
+      width: 43,
+      height: 54,
+      zIndex: 7,
     },
 
     Accessories: {
-      top: 190,
-      left: 235,
-      width: 45,
-      height: 45,
+      top: 254,
+      left: 238,
+      width: 43,
+      height: 54,
+      zIndex: 7,
+    },
+  },
+
+  suggestion: {
+    canvas: {
+      width: 300,
+      height: 440,
+    },
+
+    /*
+     * تستخدمها:
+     * Random
+     * Smart
+     * Occasion
+     * Weather
+     */
+    Jackets: {
+      top: 8,
+      left: 4,
+      width: 101,
+      height: 96,
       zIndex: 5,
+    },
+
+    Tops: {
+      top: 40,
+      left: 50,
+      width: 200,
+      height: 200,
+      zIndex: 3,
+    },
+
+   Bottoms: {
+      top: 194,
+      left: 45,
+      width: 200,
+      height: 180,
+      zIndex: 2,
+    },
+
+    Dresses: {
+      top: 61,
+      left: 61,
+      width: 181,
+      height: 330,
+      zIndex: 3,
+    },
+
+    Shoes: {
+      top: 330,
+      left: 50,
+      width: 220,
+      height: 100,
+      zIndex: 6,
+    },
+
+    Watch: {
+      top: 200,
+      left: 190,
+      width: 80,
+      height: 100,
+      zIndex: 7,
+    },
+
+    Glasses: {
+      top: 31,
+      left: 224,
+      width: 69,
+      height: 44,
+      zIndex: 7,
+    },
+
+
+Cap: {
+      top: 8,
+      left: 160,
+      width: 150,
+      height: 100,
+      zIndex: 7,
+    },
+
+   Bag: {
+      top: 180,
+      left: -30,
+      width: 150,
+      height: 180,
+      zIndex: 7,
+    },
+
+    Other: {
+      top: 266,
+      left: 250,
+      width: 45,
+      height: 57,
+      zIndex: 7,
+    },
+
+    Accessories: {
+      top: 266,
+      left: 250,
+      width: 45,
+      height: 57,
+      zIndex: 7,
     },
   },
 
   savedCard: {
-    canvas: { width: 180, height: 210 },
+    canvas: {
+      width: 180,
+      height: 220,
+    },
 
     Jackets: {
-      top: 0,
-      left: 18,
-      width: 145,
-      height: 108,
-      zIndex: 3,
-    },
-
-    Tops: {
-      top: 2,
-      left: 18,
-      width: 145,
-      height: 128,
-      zIndex: 2,
-    },
-
-    Bottoms: {
-      top: 84,
-      left: 18,
-      width: 138,
-      height: 118,
-      zIndex: 1,
-    },
-
-    Dresses: {
-      top: 2,
-      left: 18,
-      width: 145,
-      height: 185,
-      zIndex: 2,
-    },
-
-    Shoes: {
-      top: 150,
-      left: 78,
-      width: 110,
-      height: 66,
-      zIndex: 4,
-    },
-
-    Watch: {
-      top: 98,
-      left: 146,
-      width: 24,
-      height: 24,
-      zIndex: 5,
-    },
-
-    Glasses: {
-      top: 8,
-      left: 74,
-      width: 34,
-      height: 20,
-      zIndex: 5,
-    },
-
-    Cap: {
-      top: 0,
-      left: 72,
-      width: 36,
-      height: 26,
-      zIndex: 5,
-    },
-
-    Bag: {
-      top: 104,
-      left: 0,
-      width: 42,
+      top: 4,
+      left: 2,
+      width: 61,
       height: 58,
       zIndex: 5,
     },
 
+    Tops: {
+      top: 36,
+      left: 37,
+      width: 107,
+      height: 96,
+      zIndex: 3,
+    },
+
+    Bottoms: {
+      top: 102,
+      left: 42,
+      width: 101,
+      height: 113,
+      zIndex: 2,
+    },
+
+    Dresses: {
+      top: 31,
+      left: 37,
+      width: 109,
+      height: 180,
+      zIndex: 3,
+    },
+
+    Shoes: {
+      top: 150,
+      left: 59,
+      width: 150,
+      height: 70,
+      zIndex: 6,
+    },
+
+    Watch: {
+      top: 90,
+      left: 120,
+      width: 60,
+      height: 90,
+      zIndex: 7,
+    },
+
+    Glasses: {
+      top: 16,
+      left: 135,
+      width: 41,
+      height: 27,
+      zIndex: 7,
+    },
+
+    Cap: {
+      top: 35,
+      left: 120,
+      width: 60,
+      height: 47,
+      zIndex: 7,
+    },
+
+    Bag: {
+      top: 100,
+      left: 8,
+      width: 70,
+      height: 80,
+      zIndex: 7,
+    },
+
     Other: {
-      top: 104,
-      left: 146,
-      width: 24,
-      height: 24,
-      zIndex: 5,
+      top: 133,
+      left: 150,
+      width: 27,
+      height: 34,
+      zIndex: 7,
     },
 
     Accessories: {
-      top: 104,
-      left: 146,
-      width: 24,
-      height: 24,
-      zIndex: 5,
+      top: 133,
+      left: 150,
+      width: 27,
+      height: 34,
+      zIndex: 7,
     },
   },
 
   details: {
-    canvas: { width: 320, height: 470 },
+    canvas: {
+      width: 320,
+      height: 470,
+    },
 
     Jackets: {
-      top: -10,
-      left: 5,
-      width: 310,
-      height: 235,
-      zIndex: 3,
+      top: 9,
+      left: 4,
+      width: 108,
+      height: 103,
+      zIndex: 5,
     },
 
     Tops: {
-      top: 10,
-      left: 15,
-      width: 290,
-      height: 245,
-      zIndex: 2,
+      top: 40,
+      left: 50,
+      width: 200,
+      height: 200,
+      zIndex: 3,
     },
 
-    Bottoms: {
-      top: 165,
-      left: 25,
-      width: 270,
-      height: 290,
-      zIndex: 1,
+   Bottoms: {
+      top: 194,
+      left: 45,
+      width: 200,
+      height: 180,
+      zIndex: 2,
     },
 
     Dresses: {
-      top: 5,
-      left: 15,
-      width: 290,
-      height: 415,
-      zIndex: 2,
+      top: 65,
+      left: 65,
+      width: 193,
+      height: 353,
+      zIndex: 3,
     },
 
     Shoes: {
-      top: 365,
-      left: 110,
-      width: 280,
-      height: 135,
-      zIndex: 4,
+      top: 330,
+      left: 50,
+      width: 220,
+      height: 100,
+      zIndex: 6,
     },
 
     Watch: {
-      top: 195,
-      left: 260,
-      width: 44,
-      height: 44,
-      zIndex: 5,
+      top: 200,
+      left: 190,
+      width: 80,
+      height: 100,
+      zIndex: 7,
     },
 
     Glasses: {
-      top: 10,
-      left: 128,
-      width: 66,
-      height: 40,
-      zIndex: 5,
+      top: 34,
+      left: 239,
+      width: 74,
+      height: 47,
+      zIndex: 7,
     },
 
-    Cap: {
-      top: 0,
-      left: 124,
-      width: 72,
-      height: 55,
-      zIndex: 5,
+   Cap: {
+      top: 8,
+      left: 160,
+      width: 150,
+      height: 100,
+      zIndex: 7,
     },
 
-    Bag: {
-      top: 220,
-      left: 10,
-      width: 82,
-      height: 112,
-      zIndex: 5,
+   Bag: {
+      top: 180,
+      left: -30,
+      width: 150,
+      height: 180,
+      zIndex: 7,
     },
 
     Other: {
-      top: 205,
-      left: 260,
+      top: 284,
+      left: 266,
       width: 48,
-      height: 48,
-      zIndex: 5,
+      height: 61,
+      zIndex: 7,
     },
 
     Accessories: {
-      top: 205,
-      left: 260,
+      top: 284,
+      left: 266,
       width: 48,
-      height: 48,
-      zIndex: 5,
+      height: 61,
+      zIndex: 7,
     },
   },
 } as const;

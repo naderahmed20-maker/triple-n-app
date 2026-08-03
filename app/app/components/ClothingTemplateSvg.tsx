@@ -1,0 +1,460 @@
+import Svg, {
+    Path,
+    type SvgProps,
+} from 'react-native-svg';
+
+export type ClothingTemplateVariant =
+  | 'mask'
+  | 'outline'
+  | 'cameraOutline';
+
+export type MaleClothingTemplateId =
+  | 'male-tshirt-regular'
+  | 'male-tshirt-oversized'
+  | 'male-polo'
+  | 'male-shirt-short-sleeve'
+  | 'male-shirt-long-sleeve'
+  | 'male-short-shorts'
+  | 'male-long-shorts'
+  | 'male-pants'
+  | 'male-sneakers-slim'
+  | 'male-sneakers-regular'
+  | 'male-sneakers-chunky'
+  | 'male-shoes-classic-lace-up'
+  | 'male-shoes-loafer';
+
+type ClothingTemplateSvgProps =
+  SvgProps & {
+    templateId:
+      | MaleClothingTemplateId
+      | string;
+
+    variant?:
+      ClothingTemplateVariant;
+
+    width?:
+      number | string;
+
+    height?:
+      number | string;
+  };
+
+const TEMPLATE_PATHS:
+  Record<
+    MaleClothingTemplateId,
+    string
+  > = {
+  'male-tshirt-regular': `
+    M382 48
+    C409 96 445 118 500 118
+    C555 118 591 96 618 48
+    L784 124
+    L972 374
+    L798 496
+    L746 414
+    L744 956
+    L256 956
+    L254 414
+    L202 496
+    L28 374
+    L216 124
+    Z
+  `,
+
+  'male-tshirt-oversized': `
+    M372 58
+    C405 94 445 108 500 108
+    C555 108 595 94 628 58
+    L790 158
+    C824 203 864 270 904 336
+    L968 438
+    L808 544
+    L770 500
+    L782 938
+    L218 938
+    L230 500
+    L192 544
+    L32 438
+    L96 336
+    C136 270 176 203 210 158
+    Z
+  `,
+
+  /**
+   * نفس تصميم ياقة القميص:
+   * جانبان مرتفعان وفتحة V واضحة في المنتصف.
+   */
+  'male-polo': `
+    M368 48
+    L438 112
+    L500 76
+    L562 112
+    L632 48
+    L790 124
+    L968 362
+    L800 478
+    L748 398
+    L744 956
+    L256 956
+    L252 398
+    L200 478
+    L32 362
+    L210 124
+    Z
+  `,
+
+  'male-shirt-short-sleeve': `
+    M392 60
+    C430 52 570 52 608 60
+    L646 150
+    L752 196
+    C820 226 862 272 900 346
+    L964 520
+    L806 618
+    L748 566
+    L748 874
+    C748 922 636 950 500 950
+    C364 950 252 922 252 874
+    L252 566
+    L194 618
+    L36 520
+    L100 346
+    C138 272 180 226 248 196
+    L354 150
+    Z
+  `,
+
+  'male-shirt-long-sleeve': `
+    M392 60
+    C430 52 570 52 608 60
+    L646 150
+    L748 194
+    C804 218 844 264 872 336
+    L954 874
+    L812 896
+    L736 566
+    L736 872
+    C736 922 632 950 500 950
+    C368 950 264 922 264 872
+    L264 566
+    L188 896
+    L46 874
+    L128 336
+    C156 264 196 218 252 194
+    L354 150
+    Z
+  `,
+
+  'male-short-shorts': `
+    M248 168
+    C330 150 670 150 752 168
+    L792 690
+    L592 716
+    L530 458
+    L470 458
+    L408 716
+    L208 690
+    Z
+  `,
+
+  'male-long-shorts': `
+    M246 166
+    C330 148 670 148 754 166
+    L798 818
+    L596 842
+    L532 468
+    L468 468
+    L404 842
+    L202 818
+    Z
+  `,
+
+  'male-pants': `
+    M278 154
+    C350 142 650 142 722 154
+    L754 944
+    L562 944
+    L500 420
+    L438 944
+    L246 944
+    Z
+  `,
+
+  /**
+   * Slim Sneaker
+   */
+  'male-sneakers-slim': `
+    M92 690
+    L94 610
+    C96 568 104 526 122 492
+    C134 468 152 462 174 480
+    C190 494 202 518 224 534
+    C252 554 286 562 326 560
+    C354 558 380 550 402 538
+    L398 494
+    C396 472 404 448 420 428
+    C430 416 444 414 458 424
+    L530 474
+    C572 500 620 528 674 554
+    C734 582 792 600 850 610
+    C888 616 914 632 926 656
+    C936 676 936 704 930 724
+    C904 738 866 746 818 750
+    C672 760 526 760 380 760
+    L154 760
+    C122 760 100 752 92 738
+    Z
+  `,
+
+  /**
+   * Regular Sneaker
+   */
+  'male-sneakers-regular': `
+    M84 698
+    L88 598
+    C90 558 100 518 118 484
+    C130 460 150 456 172 474
+    C190 490 202 520 228 536
+    C258 556 294 562 334 558
+    C366 554 396 542 420 524
+    L416 470
+    C414 446 422 420 438 396
+    C448 382 464 378 480 388
+    L558 446
+    C602 478 648 508 704 536
+    C764 566 818 586 872 598
+    C910 606 936 622 948 650
+    C960 676 958 706 948 730
+    C926 744 890 752 842 756
+    C686 766 530 766 374 766
+    L146 766
+    C112 766 92 756 84 738
+    Z
+  `,
+
+  /**
+   * Chunky Sneaker
+   */
+  'male-sneakers-chunky': `
+    M72 704
+    C66 684 70 662 84 644
+    C72 618 78 592 98 574
+    L102 520
+    C104 486 116 456 138 436
+    C152 424 172 424 190 436
+    L214 454
+    C230 470 244 500 268 516
+    C294 534 326 540 360 536
+    C388 532 414 520 434 502
+    L430 450
+    C428 424 438 394 458 366
+    C470 350 488 346 506 358
+    L582 412
+    C628 448 680 482 738 512
+    C796 542 850 560 900 572
+    C934 580 958 598 968 628
+    C978 656 974 686 960 710
+    C966 728 958 748 940 762
+    C920 778 890 786 852 790
+    L754 798
+    C722 800 694 792 670 776
+    C648 762 624 756 598 758
+    C570 760 546 770 522 784
+    C500 798 474 804 446 802
+    L146 794
+    C110 794 84 780 74 758
+    C66 742 66 722 72 704
+    Z
+  `,
+
+  /**
+   * Classic Lace-Up Shoe
+   */
+  'male-shoes-classic-lace-up': `
+    M126 748
+    L126 672
+    C126 624 132 574 148 530
+    C160 496 180 470 204 450
+    C218 438 234 434 252 440
+    C302 458 352 468 404 468
+    C452 468 494 458 526 438
+    L530 404
+    C532 386 540 366 554 350
+    C564 338 580 336 594 346
+    L662 398
+    C704 430 746 466 782 504
+    C818 542 856 566 900 578
+    C930 586 950 604 958 632
+    C966 660 964 692 956 718
+    C930 738 896 752 852 760
+    C790 772 720 776 642 774
+    C572 772 504 764 436 752
+    L410 746
+    L410 774
+    L126 774
+    Z
+  `,
+
+  /**
+   * Loafer
+   */
+  'male-shoes-loafer': `
+    M126 752
+    L126 684
+    C126 636 132 588 146 544
+    C156 514 174 488 196 466
+    C208 454 224 450 240 456
+    C300 474 360 486 420 494
+    C468 500 506 500 538 494
+    L524 456
+    C518 436 522 414 538 394
+    C550 378 568 374 586 386
+    L660 438
+    C700 466 740 498 776 530
+    C812 562 850 582 892 592
+    C926 600 948 618 958 646
+    C968 674 966 704 956 730
+    C932 748 896 760 848 768
+    C784 778 712 780 632 776
+    C558 772 486 764 414 752
+    L410 780
+    L126 780
+    Z
+  `,
+};
+
+function isMaleTemplateId(
+  templateId: string
+): templateId is MaleClothingTemplateId {
+  return (
+    templateId in
+    TEMPLATE_PATHS
+  );
+}
+
+export function getClothingTemplatePath(
+  templateId: string
+): string | null {
+  if (
+    !isMaleTemplateId(
+      templateId
+    )
+  ) {
+    return null;
+  }
+
+  return TEMPLATE_PATHS[
+    templateId
+  ];
+}
+
+export default function ClothingTemplateSvg({
+  templateId,
+  variant =
+    'cameraOutline',
+  width =
+    '100%',
+  height =
+    '100%',
+  ...svgProps
+}: ClothingTemplateSvgProps) {
+  if (
+    !isMaleTemplateId(
+      templateId
+    )
+  ) {
+    console.warn(
+      `[ClothingTemplateSvg] Unknown template: ${templateId}`
+    );
+
+    return null;
+  }
+
+  const path =
+    TEMPLATE_PATHS[
+      templateId
+    ];
+
+  if (
+    variant ===
+    'mask'
+  ) {
+    return (
+      <Svg
+        width={
+          width
+        }
+        height={
+          height
+        }
+        viewBox="0 0 1000 1000"
+        preserveAspectRatio="xMidYMid meet"
+        {...svgProps}
+      >
+        <Path
+          d={
+            path
+          }
+          fill="#000000"
+          fillRule="evenodd"
+        />
+      </Svg>
+    );
+  }
+
+  if (
+    variant ===
+    'outline'
+  ) {
+    return (
+      <Svg
+        width={
+          width
+        }
+        height={
+          height
+        }
+        viewBox="0 0 1000 1000"
+        preserveAspectRatio="xMidYMid meet"
+        {...svgProps}
+      >
+        <Path
+          d={
+            path
+          }
+          fill="none"
+          stroke="#000000"
+          strokeWidth={14}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+    );
+  }
+
+  return (
+    <Svg
+      width={
+        width
+      }
+      height={
+        height
+      }
+      viewBox="0 0 1000 1000"
+      preserveAspectRatio="xMidYMid meet"
+      {...svgProps}
+    >
+      <Path
+        d={
+          path
+        }
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth={12}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeDasharray="22 14"
+      />
+    </Svg>
+  );
+}

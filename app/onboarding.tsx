@@ -1,5 +1,9 @@
+import { useTranslation } from '@/lib/i18n';
+import { saveMyProfile } from '@/lib/profileService';
+
 import { router } from 'expo-router';
 import { useState } from 'react';
+
 import {
     Alert,
     KeyboardAvoidingView,
@@ -12,28 +16,46 @@ import {
     View,
 } from 'react-native';
 
-import { saveMyProfile } from '@/lib/profileService';
-
 export default function OnboardingScreen() {
-  const [firstName, setFirstName] = useState('');
-  const [gender, setGender] = useState('');
-  const [birthDate, setBirthDate] = useState('');
+  const { t } = useTranslation();
 
-  const [loading, setLoading] = useState(false);
+  const [firstName, setFirstName] =
+    useState('');
+
+  const [gender, setGender] =
+    useState('');
+
+  const [birthDate, setBirthDate] =
+    useState('');
+
+  const [loading, setLoading] =
+    useState(false);
 
   async function continueApp() {
     if (!firstName.trim()) {
-      Alert.alert('Missing', 'Please enter your first name.');
+      Alert.alert(
+        t('onboarding.missingTitle'),
+        t('onboarding.enterFirstName')
+      );
+
       return;
     }
 
     if (!gender) {
-      Alert.alert('Missing', 'Please choose your gender.');
+      Alert.alert(
+        t('onboarding.missingTitle'),
+        t('onboarding.chooseGender')
+      );
+
       return;
     }
 
-    if (!birthDate) {
-      Alert.alert('Missing', 'Please enter your birth date.');
+    if (!birthDate.trim()) {
+      Alert.alert(
+        t('onboarding.missingTitle'),
+        t('onboarding.enterBirthDate')
+      );
+
       return;
     }
 
@@ -41,21 +63,37 @@ export default function OnboardingScreen() {
       setLoading(true);
 
       const normalizedBirthDate =
-  birthDate.includes('/')
-    ? birthDate.split('/').reverse().join('-')
-    : birthDate;
+        birthDate.includes('/')
+          ? birthDate
+              .split('/')
+              .reverse()
+              .join('-')
+          : birthDate;
 
       await saveMyProfile({
-  firstName,
-  gender,
-  birthDate: normalizedBirthDate,
-});
+        firstName:
+          firstName.trim(),
 
-      router.replace('/app/home' as any);
-    } catch (e: any) {
+        gender,
+
+        birthDate:
+          normalizedBirthDate,
+      });
+
+      router.replace(
+        '/app/home' as any
+      );
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : t(
+              'onboarding.genericError'
+            );
+
       Alert.alert(
-        'Error',
-        e.message ?? 'Something went wrong.'
+        t('common.error'),
+        message
       );
     } finally {
       setLoading(false);
@@ -72,105 +110,165 @@ export default function OnboardingScreen() {
       }
     >
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={
+          styles.content
+        }
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={
+          false
+        }
       >
         <Text style={styles.logo}>
-          Triple N
+          TRIPLE N
         </Text>
 
         <Text style={styles.title}>
-          Welcome 👋
+          {t('onboarding.welcome')}
         </Text>
 
         <Text style={styles.subtitle}>
-          Before we start, tell us a little about you.
+          {t('onboarding.subtitle')}
         </Text>
 
         <Text style={styles.label}>
-          First Name
+          {t('onboarding.firstName')}
         </Text>
 
         <TextInput
           style={styles.input}
-          placeholder="Ahmed"
+          placeholder={t(
+            'onboarding.firstNamePlaceholder'
+          )}
           placeholderTextColor="#777"
           value={firstName}
           onChangeText={setFirstName}
+          autoCapitalize="words"
+          autoCorrect={false}
+          returnKeyType="next"
+          editable={!loading}
         />
 
         <Text style={styles.label}>
-          Gender
+          {t('onboarding.gender')}
         </Text>
 
         <View style={styles.genderRow}>
           <TouchableOpacity
             style={[
               styles.genderButton,
+
               gender === 'Male' &&
                 styles.genderActive,
             ]}
             onPress={() =>
               setGender('Male')
             }
+            activeOpacity={0.85}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityState={{
+              selected:
+                gender === 'Male',
+            }}
+            accessibilityLabel={t(
+              'onboarding.male'
+            )}
           >
             <Text
               style={[
                 styles.genderText,
+
                 gender === 'Male' &&
                   styles.genderTextActive,
               ]}
             >
-              👨 Male
+              👨 {t('onboarding.male')}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[
               styles.genderButton,
+
               gender === 'Female' &&
                 styles.genderActive,
             ]}
             onPress={() =>
               setGender('Female')
             }
+            activeOpacity={0.85}
+            disabled={loading}
+            accessibilityRole="button"
+            accessibilityState={{
+              selected:
+                gender === 'Female',
+            }}
+            accessibilityLabel={t(
+              'onboarding.female'
+            )}
           >
             <Text
               style={[
                 styles.genderText,
+
                 gender === 'Female' &&
                   styles.genderTextActive,
               ]}
             >
-              👩 Female
+              👩 {t('onboarding.female')}
             </Text>
           </TouchableOpacity>
         </View>
 
         <Text style={styles.label}>
-          Date of Birth
+          {t('onboarding.birthDate')}
         </Text>
 
         <TextInput
           style={styles.input}
-          placeholder="2003-07-14"
+          placeholder={t(
+            'onboarding.birthDatePlaceholder'
+          )}
           placeholderTextColor="#777"
           value={birthDate}
           onChangeText={setBirthDate}
+          keyboardType={
+            Platform.OS === 'ios'
+              ? 'numbers-and-punctuation'
+              : 'numeric'
+          }
+          autoCorrect={false}
+          autoCapitalize="none"
+          returnKeyType="done"
+          editable={!loading}
+          onSubmitEditing={
+            continueApp
+          }
         />
 
         <TouchableOpacity
-          style={styles.button}
+          style={[
+            styles.button,
+
+            loading &&
+              styles.buttonDisabled,
+          ]}
           disabled={loading}
           onPress={continueApp}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={t(
+            'onboarding.continue'
+          )}
         >
           <Text style={styles.buttonText}>
             {loading
-              ? 'Saving...'
-              : 'Continue'}
+              ? t('onboarding.saving')
+              : t(
+                  'onboarding.continue'
+                )}
           </Text>
         </TouchableOpacity>
-
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -234,7 +332,8 @@ const styles = StyleSheet.create({
 
   genderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent:
+      'space-between',
     gap: 12,
   },
 
@@ -271,6 +370,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1d8c2',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  buttonDisabled: {
+    opacity: 0.65,
   },
 
   buttonText: {

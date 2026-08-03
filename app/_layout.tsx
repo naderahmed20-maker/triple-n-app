@@ -1,3 +1,7 @@
+// app/_layout.tsx
+
+import 'react-native-reanimated';
+
 import {
   DarkTheme,
   DefaultTheme,
@@ -10,149 +14,756 @@ import {
   useSegments,
 } from 'expo-router';
 
-import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
-import { View } from 'react-native';
-import 'react-native-reanimated';
+import Constants from 'expo-constants';
+import * as Device from 'expo-device';
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { supabase } from '@/lib/supabase';
+import {
+  StatusBar,
+} from 'expo-status-bar';
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const segments = useSegments();
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
-  const [ready, setReady] = useState(false);
+import {
+  ActivityIndicator,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
-  const [hasSession, setHasSession] =
-    useState<boolean | null>(null);
+import {
+  useColorScheme,
+} from '@/hooks/use-color-scheme';
 
-  useEffect(() => {
-    let mounted = true;
+import {
+  TranslationProvider,
+} from '@/lib/i18n';
 
-    async function loadSession() {
-      try {
-        const { data, error } =
-          await supabase.auth.getSession();
+import {
+  registerForPushNotifications,
+} from '@/lib/notificationService';
 
-        if (error) {
-          throw error;
-        }
+import {
+  supabase,
+} from '@/lib/supabase';
 
-        if (!mounted) return;
+/* =========================================================
+ * Device gate types
+ * ======================================================= */
 
-        setHasSession(Boolean(data.session));
-      } catch (error) {
-        console.log(
-          'SESSION LOAD ERROR:',
-          error
+type DeviceGateStatus =
+  | 'checking'
+  | 'supported'
+  | 'unsupported';
+
+type DeviceGateReason =
+  | 'expo-go'
+  | 'web'
+  | 'simulator'
+  | 'insufficient-memory'
+  | 'unsupported-platform'
+  | 'device-check-failed'
+  | null;
+
+type DeviceGateResult = {
+  status:
+    DeviceGateStatus;
+
+  reason:
+    DeviceGateReason;
+
+  title:
+    string;
+
+  message:
+    string;
+
+  totalMemoryBytes:
+    number | null;
+
+  totalMemoryGB:
+    number | null;
+
+  platform:
+    string;
+
+  checkedAt:
+    number | null;
+};
+
+/* =========================================================
+ * Device compatibility constants
+ * ======================================================= */
+
+/**
+ * الحد الأدنى الآمن لتشغيل EdgeSAM محليًا.
+ *
+ * Device.totalMemory قد يعرض قيمة أقل قليلًا
+ * من الرقم التجاري المكتوب على الجهاز.
+ *
+ * لذلك هذا الحد يسمح للأجهزة من فئة 4 GB
+ * أو أعلى بالمرور بصورة آمنة.
+ */
+const MINIMUM_REPORTED_RAM_BYTES =
+  3 * 1024 * 1024 * 1024;
+
+/**
+ * القيمة المفضلة وليست شرط منع إضافيًا.
+ */
+const RECOMMENDED_RAM_BYTES =
+  4 * 1024 * 1024 * 1024;
+
+const INITIAL_DEVICE_GATE:
+  DeviceGateResult = {
+  status:
+    'checking',
+
+  reason:
+    null,
+
+  title:
+    'Checking your device',
+
+  message:
+    'Preparing Triple N for secure local AI processing.',
+
+  totalMemoryBytes:
+    null,
+
+  totalMemoryGB:
+    null,
+
+  platform:
+    Platform.OS,
+
+  checkedAt:
+    null,
+};
+
+/* =========================================================
+ * General helpers
+ * ======================================================= */
+
+function bytesToGigabytes(
+  bytes:
+    number | null
+): number | null {
+  if (
+    bytes ===
+      null ||
+    !Number.isFinite(
+      bytes
+    ) ||
+    bytes <=
+      0
+  ) {
+    return null;
+  }
+
+  return (
+    bytes /
+    (
+      1024 *
+      1024 *
+      1024
+    )
+  );
+}
+
+function formatGigabytes(
+  value:
+    number | null
+): string | null {
+  if (
+    value ===
+      null ||
+    !Number.isFinite(
+      value
+    )
+  ) {
+    return null;
+  }
+
+  return value.toFixed(
+    1
+  );
+}
+
+function isExpoGo():
+  boolean {
+  /**
+   * storeClient يعني أن التطبيق يعمل
+   * داخل Expo Go وليس Development Build.
+   */
+  return (
+    Constants
+      .executionEnvironment ===
+    'storeClient'
+  );
+}
+
+function isSupportedNativePlatform():
+  boolean {
+  return (
+    Platform.OS ===
+      'ios' ||
+    Platform.OS ===
+      'android'
+  );
+}
+
+/* =========================================================
+ * Device compatibility check
+ * ======================================================= */
+
+async function checkDeviceCompatibility():
+  Promise<DeviceGateResult> {
+  const checkedAt =
+    Date.now();
+
+  try {
+    /* -----------------------------------------------------
+     * Web is not supported
+     * --------------------------------------------------- */
+
+    if (
+      Platform.OS ===
+      'web'
+    ) {
+      return {
+        status:
+          'unsupported',
+
+        reason:
+          'web',
+
+        title:
+          'Mobile device required',
+
+        message:
+          'Triple N local AI scanning is available only on supported iPhone and Android devices.',
+
+        totalMemoryBytes:
+          null,
+
+        totalMemoryGB:
+          null,
+
+        platform:
+          Platform.OS,
+
+        checkedAt,
+      };
+    }
+
+    /* -----------------------------------------------------
+     * Only iOS and Android
+     * --------------------------------------------------- */
+
+    if (
+      !isSupportedNativePlatform()
+    ) {
+      return {
+        status:
+          'unsupported',
+
+        reason:
+          'unsupported-platform',
+
+        title:
+          'Unsupported platform',
+
+        message:
+          'This version of Triple N supports local AI scanning on iOS and Android only.',
+
+        totalMemoryBytes:
+          null,
+
+        totalMemoryGB:
+          null,
+
+        platform:
+          Platform.OS,
+
+        checkedAt,
+      };
+    }
+
+    /* -----------------------------------------------------
+     * Expo Go cannot load native ONNX modules
+     * --------------------------------------------------- */
+
+    if (
+      isExpoGo()
+    ) {
+      return {
+        status:
+          'unsupported',
+
+        reason:
+          'expo-go',
+
+        title:
+          'Development Build required',
+
+        message:
+          'The local AI scanner cannot run inside Expo Go. Install the Triple N Development Build or production app.',
+
+        totalMemoryBytes:
+          Device.totalMemory,
+
+        totalMemoryGB:
+          bytesToGigabytes(
+            Device.totalMemory
+          ),
+
+        platform:
+          Platform.OS,
+
+        checkedAt,
+      };
+    }
+
+    /* -----------------------------------------------------
+     * Physical device required
+     * --------------------------------------------------- */
+
+    if (
+      !Device.isDevice
+    ) {
+      return {
+        status:
+          'unsupported',
+
+        reason:
+          'simulator',
+
+        title:
+          'Physical device required',
+
+        message:
+          'Triple N local AI scanning must be tested and used on a real supported device, not a simulator or emulator.',
+
+        totalMemoryBytes:
+          Device.totalMemory,
+
+        totalMemoryGB:
+          bytesToGigabytes(
+            Device.totalMemory
+          ),
+
+        platform:
+          Platform.OS,
+
+        checkedAt,
+      };
+    }
+
+    /* -----------------------------------------------------
+     * RAM gate
+     * --------------------------------------------------- */
+
+    const totalMemoryBytes =
+      typeof Device.totalMemory ===
+        'number' &&
+      Number.isFinite(
+        Device.totalMemory
+      ) &&
+      Device.totalMemory >
+        0
+        ? Device.totalMemory
+        : null;
+
+    const totalMemoryGB =
+      bytesToGigabytes(
+        totalMemoryBytes
+      );
+
+    if (
+      totalMemoryBytes !==
+        null &&
+      totalMemoryBytes <
+        MINIMUM_REPORTED_RAM_BYTES
+    ) {
+      const formattedMemory =
+        formatGigabytes(
+          totalMemoryGB
         );
 
-        if (mounted) {
-          setHasSession(false);
-        }
-      } finally {
-        if (mounted) {
-          setReady(true);
-        }
-      }
+      return {
+        status:
+          'unsupported',
+
+        reason:
+          'insufficient-memory',
+
+        title:
+          'Device not supported',
+
+        message:
+          formattedMemory
+            ? `This device reports ${formattedMemory} GB of system memory. Triple N local AI scanning requires a supported 4 GB-class device or higher.`
+            : 'This device does not have enough memory to run Triple N local AI scanning safely.',
+
+        totalMemoryBytes,
+
+        totalMemoryGB,
+
+        platform:
+          Platform.OS,
+
+        checkedAt,
+      };
     }
 
-    loadSession();
+    /* -----------------------------------------------------
+     * Supported
+     * --------------------------------------------------- */
 
-    const { data: authListener } =
-      supabase.auth.onAuthStateChange(
-        (_event, session) => {
-          if (!mounted) return;
+    return {
+      status:
+        'supported',
 
-          setHasSession(
-            Boolean(session)
-          );
-        }
-      );
+      reason:
+        null,
 
-    return () => {
-      mounted = false;
+      title:
+        'Device supported',
 
-      authListener.subscription.unsubscribe();
+      message:
+        totalMemoryBytes !==
+          null &&
+        totalMemoryBytes <
+          RECOMMENDED_RAM_BYTES
+          ? 'Your device passed the local AI safety gate. Triple N will load EdgeSAM only when Scan Item processing starts.'
+          : 'Your device is ready for secure local AI processing.',
+
+      totalMemoryBytes,
+
+      totalMemoryGB,
+
+      platform:
+        Platform.OS,
+
+      checkedAt,
     };
-  }, []);
-
-  useEffect(() => {
-    if (
-      !ready ||
-      hasSession === null
-    ) {
-      return;
-    }
-
-    const firstSegment =
-      segments[0];
-
-    const inAuthScreen =
-      firstSegment === 'login' ||
-      firstSegment === 'signup';
-
-    if (
-      !hasSession &&
-      !inAuthScreen
-    ) {
-      router.replace(
-        '/login' as any
-      );
-
-      return;
-    }
-
-    if (
-      hasSession &&
-      inAuthScreen
-    ) {
-      router.replace(
-        '/home' as any
-      );
-    }
-  }, [
-    ready,
-    hasSession,
-    segments,
-  ]);
-
-  if (!ready) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor:
-            '#050505',
-        }}
-      />
+  } catch (error) {
+    console.log(
+      'DEVICE COMPATIBILITY CHECK ERROR:',
+      error
     );
+
+    return {
+      status:
+        'unsupported',
+
+      reason:
+        'device-check-failed',
+
+      title:
+        'Device check failed',
+
+      message:
+        'Triple N could not verify that this device can run local AI safely. Please close the app and try again.',
+
+      totalMemoryBytes:
+        null,
+
+      totalMemoryGB:
+        null,
+
+      platform:
+        Platform.OS,
+
+      checkedAt,
+    };
   }
+}
+
+/* =========================================================
+ * Loading screen
+ * ======================================================= */
+
+function StartupLoadingScreen() {
+  return (
+    <View
+      style={
+        styles.loadingContainer
+      }
+    >
+      <View
+        style={
+          styles.logoCircle
+        }
+      >
+        <Text
+          style={
+            styles.logoLetter
+          }
+        >
+          N
+        </Text>
+      </View>
+
+      <Text
+        style={
+          styles.brandName
+        }
+      >
+        TRIPLE N
+      </Text>
+
+      <Text
+        style={
+          styles.loadingTitle
+        }
+      >
+        Preparing your experience
+      </Text>
+
+      <ActivityIndicator
+        size="small"
+        color="#f2f2f2"
+        style={
+          styles.loadingIndicator
+        }
+      />
+
+      <Text
+        style={
+          styles.loadingMessage
+        }
+      >
+        Checking device security and account session.
+      </Text>
+    </View>
+  );
+}
+
+/* =========================================================
+ * Unsupported device screen
+ * ======================================================= */
+
+type UnsupportedDeviceScreenProps = {
+  result:
+    DeviceGateResult;
+
+  checking:
+    boolean;
+
+  onRetry:
+    () => void;
+};
+
+function UnsupportedDeviceScreen({
+  result,
+  checking,
+  onRetry,
+}: UnsupportedDeviceScreenProps) {
+  const memoryLabel =
+    formatGigabytes(
+      result.totalMemoryGB
+    );
+
+  return (
+    <View
+      style={
+        styles.unsupportedContainer
+      }
+    >
+      <View
+        style={
+          styles.unsupportedCard
+        }
+      >
+        <View
+          style={
+            styles.warningIcon
+          }
+        >
+          <Text
+            style={
+              styles.warningIconText
+            }
+          >
+            !
+          </Text>
+        </View>
+
+        <Text
+          style={
+            styles.unsupportedTitle
+          }
+        >
+          {result.title}
+        </Text>
+
+        <Text
+          style={
+            styles.unsupportedMessage
+          }
+        >
+          {result.message}
+        </Text>
+
+        <View
+          style={
+            styles.deviceDetails
+          }
+        >
+          <View
+            style={
+              styles.deviceDetailRow
+            }
+          >
+            <Text
+              style={
+                styles.deviceDetailLabel
+              }
+            >
+              Platform
+            </Text>
+
+            <Text
+              style={
+                styles.deviceDetailValue
+              }
+            >
+              {result.platform}
+            </Text>
+          </View>
+
+          {memoryLabel ? (
+            <View
+              style={
+                styles.deviceDetailRow
+              }
+            >
+              <Text
+                style={
+                  styles.deviceDetailLabel
+                }
+              >
+                Reported memory
+              </Text>
+
+              <Text
+                style={
+                  styles.deviceDetailValue
+                }
+              >
+                {memoryLabel} GB
+              </Text>
+            </View>
+          ) : null}
+
+          <View
+            style={
+              styles.deviceDetailRow
+            }
+          >
+            <Text
+              style={
+                styles.deviceDetailLabel
+              }
+            >
+              Local AI
+            </Text>
+
+            <Text
+              style={
+                styles.deviceDetailValue
+              }
+            >
+              Unavailable
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          activeOpacity={
+            0.8
+          }
+          disabled={
+            checking
+          }
+          style={[
+            styles.retryButton,
+
+            checking &&
+              styles
+                .retryButtonDisabled,
+          ]}
+          onPress={
+            onRetry
+          }
+        >
+          {checking ? (
+            <ActivityIndicator
+              size="small"
+              color="#080808"
+            />
+          ) : (
+            <Text
+              style={
+                styles
+                  .retryButtonText
+              }
+            >
+              Check again
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        <Text
+          style={
+            styles.unsupportedFooter
+          }
+        >
+          Triple N blocks unsupported devices to prevent crashes, memory pressure, and damaged scan results.
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+/* =========================================================
+ * Navigation stack
+ * ======================================================= */
+
+function RootNavigationStack() {
+  const colorScheme =
+    useColorScheme();
 
   return (
     <ThemeProvider
       value={
-        colorScheme === 'dark'
+        colorScheme ===
+        'dark'
           ? DarkTheme
           : DefaultTheme
       }
     >
       <Stack
         screenOptions={{
-          headerShown: false,
+          headerShown:
+            false,
 
-          // تفعيل سحب الرجوع على iPhone
-          gestureEnabled: true,
+          gestureEnabled:
+            true,
 
-          // يسمح بالسحب من أي مكان في الشاشة
-          fullScreenGestureEnabled: true,
+          fullScreenGestureEnabled:
+            true,
 
-          // حركة الصفحة من اليمين
           animation:
             'slide_from_right',
 
-          // اتجاه حركة الرجوع
           gestureDirection:
             'horizontal',
         }}
@@ -160,27 +771,37 @@ export default function RootLayout() {
         <Stack.Screen
           name="login"
           options={{
-            gestureEnabled: false,
+            gestureEnabled:
+              false,
+
             fullScreenGestureEnabled:
               false,
-            animation: 'fade',
+
+            animation:
+              'fade',
           }}
         />
 
         <Stack.Screen
           name="signup"
           options={{
-            gestureEnabled: false,
+            gestureEnabled:
+              false,
+
             fullScreenGestureEnabled:
               false,
-            animation: 'fade',
+
+            animation:
+              'fade',
           }}
         />
 
         <Stack.Screen
           name="(tabs)"
           options={{
-            gestureEnabled: false,
+            gestureEnabled:
+              false,
+
             fullScreenGestureEnabled:
               false,
           }}
@@ -189,7 +810,9 @@ export default function RootLayout() {
         <Stack.Screen
           name="onboarding"
           options={{
-            gestureEnabled: false,
+            gestureEnabled:
+              false,
+
             fullScreenGestureEnabled:
               false,
           }}
@@ -198,56 +821,111 @@ export default function RootLayout() {
         <Stack.Screen
           name="wardrobe-type"
           options={{
-            gestureEnabled: false,
+            gestureEnabled:
+              false,
+
             fullScreenGestureEnabled:
               false,
           }}
         />
 
-        <Stack.Screen name="home" />
+        <Stack.Screen
+          name="home"
+        />
 
-        <Stack.Screen name="wardrobe" />
+        <Stack.Screen
+          name="wardrobe"
+        />
 
-        <Stack.Screen name="item" />
+        <Stack.Screen
+          name="item"
+        />
 
-        <Stack.Screen name="edit-item" />
+        <Stack.Screen
+          name="processing-image"
+          options={{
+            gestureEnabled:
+              false,
 
-        <Stack.Screen name="outfit" />
+            fullScreenGestureEnabled:
+              false,
+          }}
+        />
 
-        <Stack.Screen name="saved-outfits" />
+        <Stack.Screen
+          name="edit-item"
+        />
 
-        <Stack.Screen name="profile" />
+        <Stack.Screen
+          name="outfit"
+        />
 
-        <Stack.Screen name="account" />
+        <Stack.Screen
+          name="saved-outfits"
+        />
 
-        <Stack.Screen name="settings" />
+        <Stack.Screen
+          name="profile"
+        />
 
-        <Stack.Screen name="about" />
+        <Stack.Screen
+          name="account"
+        />
 
-        <Stack.Screen name="help-center" />
+        <Stack.Screen
+          name="settings"
+        />
 
-        <Stack.Screen name="app/outfit-details" />
+        <Stack.Screen
+          name="about"
+        />
 
-        <Stack.Screen name="app/outfit-preview" />
+        <Stack.Screen
+          name="help-center"
+        />
 
-        <Stack.Screen name="app/random-outfit" />
+        <Stack.Screen
+          name="app/outfit-details"
+        />
 
-        <Stack.Screen name="app/occasion-outfit" />
+        <Stack.Screen
+          name="app/outfit-preview"
+        />
 
-        <Stack.Screen name="app/weather-outfit" />
+        <Stack.Screen
+          name="app/random-outfit"
+        />
 
-        <Stack.Screen name="app/smart-suggestion" />
+        <Stack.Screen
+          name="app/occasion-outfit"
+        />
 
-        <Stack.Screen name="app/stats" />
+        <Stack.Screen
+          name="app/weather-outfit"
+        />
+
+        <Stack.Screen
+          name="app/smart-suggestion"
+        />
+
+        <Stack.Screen
+          name="app/stats"
+        />
 
         <Stack.Screen
           name="modal"
           options={{
-            headerShown: true,
-            presentation: 'modal',
-            title: 'Modal',
+            headerShown:
+              true,
 
-            gestureEnabled: true,
+            presentation:
+              'modal',
+
+            title:
+              'Modal',
+
+            gestureEnabled:
+              true,
 
             fullScreenGestureEnabled:
               false,
@@ -258,7 +936,1145 @@ export default function RootLayout() {
         />
       </Stack>
 
-      <StatusBar style="auto" />
+      <StatusBar
+        style={
+          colorScheme ===
+          'dark'
+            ? 'light'
+            : 'dark'
+        }
+      />
     </ThemeProvider>
   );
 }
+/* =========================================================
+ * Root layout
+ * ======================================================= */
+
+export default function RootLayout() {
+  const segments =
+    useSegments();
+
+  const mountedRef =
+    useRef(
+      true
+    );
+
+  const backgroundProcessingInitializedRef =
+    useRef(
+      false
+    );
+
+  const backgroundProcessingInitializationPromiseRef =
+    useRef<
+      Promise<void> | null
+    >(
+      null
+    );
+
+  const [
+    deviceGate,
+    setDeviceGate,
+  ] =
+    useState<DeviceGateResult>(
+      INITIAL_DEVICE_GATE
+    );
+
+  const [
+    checkingDeviceAgain,
+    setCheckingDeviceAgain,
+  ] =
+    useState(
+      false
+    );
+
+  const [
+    sessionReady,
+    setSessionReady,
+  ] =
+    useState(
+      false
+    );
+
+  const [
+    hasSession,
+    setHasSession,
+  ] =
+    useState<
+      boolean | null
+    >(
+      null
+    );
+
+  /* =======================================================
+   * Mounted state
+   * ===================================================== */
+
+  useEffect(() => {
+    mountedRef.current =
+      true;
+
+    return () => {
+      mountedRef.current =
+        false;
+    };
+  }, []);
+
+  /* =======================================================
+   * Device gate
+   * ===================================================== */
+
+  const runDeviceCheck =
+    useCallback(
+      async (
+        isRetry:
+          boolean
+      ) => {
+        if (
+          isRetry
+        ) {
+          setCheckingDeviceAgain(
+            true
+          );
+        } else {
+          setDeviceGate(
+            INITIAL_DEVICE_GATE
+          );
+        }
+
+        const result =
+          await checkDeviceCompatibility();
+
+        if (
+          !mountedRef.current
+        ) {
+          return;
+        }
+
+        setDeviceGate(
+          result
+        );
+
+        setCheckingDeviceAgain(
+          false
+        );
+      },
+      []
+    );
+
+  useEffect(() => {
+    void runDeviceCheck(
+      false
+    );
+  }, [
+    runDeviceCheck,
+  ]);
+
+  /* =======================================================
+   * Background processing disposal
+   * ===================================================== */
+
+  const disposeBackgroundProcessing =
+    useCallback(
+      async () => {
+        backgroundProcessingInitializedRef
+          .current =
+          false;
+
+        backgroundProcessingInitializationPromiseRef
+          .current =
+          null;
+
+        const results =
+          await Promise.allSettled([
+            import(
+              '@/scan/core/background'
+            ).then(
+              async module => {
+                await module
+                  .disposeBackgroundNotificationsBootstrap();
+
+                await module
+                  .disposeScanItemBackgroundProcessing();
+              }
+            ),
+
+            import(
+              '@/scan/core/ai/SegmentationEngine'
+            ).then(
+              async module => {
+                await module
+                  .disposeSharedSegmentationEngine();
+              }
+            ),
+          ]);
+
+        for (
+          const result of
+          results
+        ) {
+          if (
+            result.status ===
+              'rejected'
+          ) {
+            console.log(
+              'BACKGROUND PROCESSING DISPOSE ERROR:',
+              result.reason
+            );
+          }
+        }
+      },
+      []
+    );
+
+  /* =======================================================
+   * Supabase session
+   * ===================================================== */
+
+  useEffect(() => {
+    if (
+      deviceGate.status !==
+        'supported'
+    ) {
+      return;
+    }
+
+    let active =
+      true;
+
+    async function loadSession():
+      Promise<void> {
+      try {
+        const {
+          data,
+          error,
+        } =
+          await supabase.auth
+            .getSession();
+
+        if (
+          error
+        ) {
+          throw error;
+        }
+
+        if (
+          !active ||
+          !mountedRef.current
+        ) {
+          return;
+        }
+
+        setHasSession(
+          Boolean(
+            data.session
+          )
+        );
+      } catch (error) {
+        console.log(
+          'SESSION LOAD ERROR:',
+          error
+        );
+
+        if (
+          active &&
+          mountedRef.current
+        ) {
+          setHasSession(
+            false
+          );
+        }
+      } finally {
+        if (
+          active &&
+          mountedRef.current
+        ) {
+          setSessionReady(
+            true
+          );
+        }
+      }
+    }
+
+    void loadSession();
+
+    const {
+      data:
+        authListener,
+    } =
+      supabase.auth
+        .onAuthStateChange(
+          (
+            event,
+            session
+          ) => {
+            if (
+              !active ||
+              !mountedRef.current
+            ) {
+              return;
+            }
+
+            const authenticated =
+              Boolean(
+                session
+              );
+
+            setHasSession(
+              authenticated
+            );
+
+            setSessionReady(
+              true
+            );
+
+            if (
+              event ===
+                'SIGNED_OUT' ||
+              !authenticated
+            ) {
+              void disposeBackgroundProcessing();
+            }
+          }
+        );
+
+    return () => {
+      active =
+        false;
+
+      authListener
+        .subscription
+        .unsubscribe();
+    };
+  }, [
+    deviceGate.status,
+    disposeBackgroundProcessing,
+  ]);
+
+  /* =======================================================
+   * Push notification registration
+   * ===================================================== */
+
+  useEffect(() => {
+    if (
+      deviceGate.status !==
+        'supported' ||
+      !sessionReady ||
+      !hasSession
+    ) {
+      return;
+    }
+
+    void registerForPushNotifications()
+      .catch(
+        error => {
+          console.log(
+            'PUSH NOTIFICATION REGISTRATION ERROR:',
+            error
+          );
+        }
+      );
+  }, [
+    deviceGate.status,
+    sessionReady,
+    hasSession,
+  ]);
+
+  /* =======================================================
+   * Scan Item background processing initialization
+   * ===================================================== */
+
+  useEffect(() => {
+    if (
+      deviceGate.status !==
+        'supported' ||
+      !sessionReady ||
+      !hasSession
+    ) {
+      return;
+    }
+
+    let active =
+      true;
+
+    async function initializeBackgroundProcessingSystem():
+      Promise<void> {
+      if (
+        backgroundProcessingInitializedRef
+          .current
+      ) {
+        return;
+      }
+
+      if (
+        backgroundProcessingInitializationPromiseRef
+          .current
+      ) {
+        await backgroundProcessingInitializationPromiseRef
+          .current;
+
+        return;
+      }
+
+      const initializationPromise =
+        (
+          async () => {
+            const [
+              backgroundModule,
+              wardrobeModule,
+            ] =
+              await Promise.all([
+                import(
+                  '@/scan/core/background'
+                ),
+
+                import(
+                  '@/lib/wardrobeService'
+                ),
+              ]);
+
+            if (
+              !active ||
+              !mountedRef.current
+            ) {
+              return;
+            }
+
+            await backgroundModule
+              .initializeScanItemBackgroundProcessing({
+                updateWardrobeItem:
+                  async input => {
+                    await wardrobeModule
+                      .updateWardrobeItem(
+                        input
+                          .wardrobeItemId,
+                        {
+                          image:
+                            input
+                              .processedImageUri,
+
+                          original_image_path:
+                            input
+                              .originalImageUri,
+
+                          cleaned_image_path:
+                            input
+                              .processedImageUri,
+
+                          processing_status:
+                            'ready',
+
+                          processing_error:
+                            null,
+
+                          processing_finished_at:
+                            new Date()
+                              .toISOString(),
+                        }
+                      );
+
+                    return {
+                      updated:
+                        true,
+
+                      metadata: {
+                        processedLocally:
+                          true,
+
+                        width:
+                          input.width,
+
+                        height:
+                          input.height,
+
+                        category:
+                          input.category,
+
+                        subcategory:
+                          input.subcategory,
+
+                        wardrobeType:
+                          input
+                            .wardrobeType,
+                      },
+                    };
+                  },
+
+                transparentImageQuality:
+                  100,
+
+                collectSegmentationDiagnostics:
+                  false,
+
+                reuseSegmentationSession:
+                  true,
+
+                processedFileNamePrefix:
+                  'scan-item-queue',
+
+                autoStartQueue:
+                  false,
+
+                autoStartBackgroundProcessing:
+                  false,
+
+                enableDebugLogs:
+                  __DEV__,
+              });
+
+            if (
+              !active ||
+              !mountedRef.current
+            ) {
+              return;
+            }
+
+            await backgroundModule
+              .initializeBackgroundProcessingNotifications({
+                requestPermissionOnInitialize:
+                  true,
+
+                enableDebugLogs:
+                  __DEV__,
+
+                notificationsConfig: {
+                  enabled:
+                    true,
+
+                  requestPermissionOnInitialize:
+                    true,
+
+                  notifyWhenProcessingStarts:
+                    false,
+
+                  notifyWhenSingleItemCompletes:
+                    false,
+
+                  notifyWhenBatchCompletes:
+                    true,
+
+                  notifyWhenProcessingFails:
+                    true,
+
+                  wardrobeRoute:
+                    '/wardrobe',
+                },
+
+                onOpenRoute:
+                  async (
+                    route,
+                    response
+                  ) => {
+                    if (
+                      !active ||
+                      !mountedRef.current
+                    ) {
+                      return;
+                    }
+
+                    const normalizedRoute =
+                      route ===
+                        '/app/wardrobe'
+                        ? '/wardrobe'
+                        : route;
+
+                    if (
+                      normalizedRoute ===
+                        '/processing-image' &&
+                      response.batchId
+                    ) {
+                      router.push({
+                        pathname:
+                          '/processing-image',
+
+                        params: {
+                          batchId:
+                            response.batchId,
+                        },
+                      } as never);
+
+                      return;
+                    }
+
+                    router.push(
+                      normalizedRoute as never
+                    );
+                  },
+              });
+
+            if (
+              active &&
+              mountedRef.current
+            ) {
+              backgroundProcessingInitializedRef
+                .current =
+                true;
+            }
+          }
+        )();
+
+      backgroundProcessingInitializationPromiseRef
+        .current =
+        initializationPromise;
+
+      try {
+        await initializationPromise;
+      } finally {
+        if (
+          backgroundProcessingInitializationPromiseRef
+            .current ===
+          initializationPromise
+        ) {
+          backgroundProcessingInitializationPromiseRef
+            .current =
+            null;
+        }
+      }
+    }
+
+    void initializeBackgroundProcessingSystem()
+      .catch(
+        error => {
+          backgroundProcessingInitializedRef
+            .current =
+            false;
+
+          console.log(
+            'SCAN ITEM BACKGROUND PROCESSING INITIALIZATION ERROR:',
+            error
+          );
+        }
+      );
+
+    return () => {
+      active =
+        false;
+    };
+  }, [
+    deviceGate.status,
+    sessionReady,
+    hasSession,
+  ]);
+
+  /* =======================================================
+   * Authentication navigation guard
+   * ===================================================== */
+
+  useEffect(() => {
+    if (
+      deviceGate.status !==
+        'supported' ||
+      !sessionReady ||
+      hasSession ===
+        null
+    ) {
+      return;
+    }
+
+    const firstSegment =
+      segments[0];
+
+    const inAuthScreen =
+      firstSegment ===
+        'login' ||
+      firstSegment ===
+        'signup';
+
+    if (
+      !hasSession &&
+      !inAuthScreen
+    ) {
+      router.replace(
+        '/login' as never
+      );
+
+      return;
+    }
+
+    if (
+      hasSession &&
+      inAuthScreen
+    ) {
+      router.replace(
+        '/home' as never
+      );
+    }
+  }, [
+    deviceGate.status,
+    sessionReady,
+    hasSession,
+    segments,
+  ]);
+
+  /* =======================================================
+   * Rendering gates
+   * ===================================================== */
+
+  if (
+    deviceGate.status ===
+      'checking'
+  ) {
+    return (
+      <TranslationProvider>
+        <StartupLoadingScreen />
+
+        <StatusBar
+          style="light"
+        />
+      </TranslationProvider>
+    );
+  }
+
+  if (
+    deviceGate.status ===
+      'unsupported'
+  ) {
+    return (
+      <TranslationProvider>
+        <UnsupportedDeviceScreen
+          result={
+            deviceGate
+          }
+          checking={
+            checkingDeviceAgain
+          }
+          onRetry={() => {
+            void runDeviceCheck(
+              true
+            );
+          }}
+        />
+
+        <StatusBar
+          style="light"
+        />
+      </TranslationProvider>
+    );
+  }
+
+  if (
+    !sessionReady ||
+    hasSession ===
+      null
+  ) {
+    return (
+      <TranslationProvider>
+        <StartupLoadingScreen />
+
+        <StatusBar
+          style="light"
+        />
+      </TranslationProvider>
+    );
+  }
+
+  return (
+    <TranslationProvider>
+      <RootNavigationStack />
+    </TranslationProvider>
+  );
+}
+/* =========================================================
+ * Styles
+ * ======================================================= */
+
+const styles =
+  StyleSheet.create({
+    loadingContainer: {
+      flex:
+        1,
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+
+      paddingHorizontal:
+        32,
+
+      backgroundColor:
+        '#050505',
+    },
+
+    logoCircle: {
+      width:
+        86,
+
+      height:
+        86,
+
+      borderRadius:
+        43,
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+
+      borderWidth:
+        1,
+
+      borderColor:
+        'rgba(255,255,255,0.42)',
+
+      backgroundColor:
+        '#121212',
+
+      shadowColor:
+        '#ffffff',
+
+      shadowOpacity:
+        0.12,
+
+      shadowRadius:
+        18,
+
+      shadowOffset: {
+        width:
+          0,
+
+        height:
+          0,
+      },
+
+      elevation:
+        5,
+    },
+
+    logoLetter: {
+      color:
+        '#f2f2f2',
+
+      fontSize:
+        46,
+
+      lineHeight:
+        52,
+
+      fontWeight:
+        '300',
+
+      letterSpacing:
+        1,
+    },
+
+    brandName: {
+      marginTop:
+        20,
+
+      color:
+        '#f5f5f5',
+
+      fontSize:
+        22,
+
+      fontWeight:
+        '700',
+
+      letterSpacing:
+        5,
+    },
+
+    loadingTitle: {
+      marginTop:
+        38,
+
+      color:
+        '#ffffff',
+
+      fontSize:
+        18,
+
+      fontWeight:
+        '600',
+
+      textAlign:
+        'center',
+    },
+
+    loadingIndicator: {
+      marginTop:
+        22,
+    },
+
+    loadingMessage: {
+      maxWidth:
+        310,
+
+      marginTop:
+        18,
+
+      color:
+        '#989898',
+
+      fontSize:
+        13,
+
+      lineHeight:
+        20,
+
+      textAlign:
+        'center',
+    },
+
+    unsupportedContainer: {
+      flex:
+        1,
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+
+      paddingHorizontal:
+        22,
+
+      paddingVertical:
+        42,
+
+      backgroundColor:
+        '#050505',
+    },
+
+    unsupportedCard: {
+      width:
+        '100%',
+
+      maxWidth:
+        430,
+
+      alignItems:
+        'center',
+
+      paddingHorizontal:
+        24,
+
+      paddingTop:
+        32,
+
+      paddingBottom:
+        26,
+
+      borderWidth:
+        1,
+
+      borderColor:
+        '#2b2b2b',
+
+      borderRadius:
+        28,
+
+      backgroundColor:
+        '#111111',
+    },
+
+    warningIcon: {
+      width:
+        62,
+
+      height:
+        62,
+
+      borderRadius:
+        31,
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+
+      borderWidth:
+        1,
+
+      borderColor:
+        '#5d5d5d',
+
+      backgroundColor:
+        '#1b1b1b',
+    },
+
+    warningIconText: {
+      color:
+        '#f3f3f3',
+
+      fontSize:
+        32,
+
+      lineHeight:
+        38,
+
+      fontWeight:
+        '500',
+    },
+
+    unsupportedTitle: {
+      marginTop:
+        22,
+
+      color:
+        '#ffffff',
+
+      fontSize:
+        23,
+
+      lineHeight:
+        30,
+
+      fontWeight:
+        '700',
+
+      textAlign:
+        'center',
+    },
+
+    unsupportedMessage: {
+      marginTop:
+        14,
+
+      color:
+        '#b3b3b3',
+
+      fontSize:
+        14,
+
+      lineHeight:
+        22,
+
+      textAlign:
+        'center',
+    },
+
+    deviceDetails: {
+      width:
+        '100%',
+
+      marginTop:
+        25,
+
+      paddingHorizontal:
+        16,
+
+      paddingVertical:
+        8,
+
+      borderWidth:
+        1,
+
+      borderColor:
+        '#292929',
+
+      borderRadius:
+        17,
+
+      backgroundColor:
+        '#0b0b0b',
+    },
+
+    deviceDetailRow: {
+      minHeight:
+        45,
+
+      flexDirection:
+        'row',
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'space-between',
+
+      borderBottomWidth:
+        StyleSheet.hairlineWidth,
+
+      borderBottomColor:
+        '#292929',
+    },
+
+    deviceDetailLabel: {
+      flex:
+        1,
+
+      paddingRight:
+        14,
+
+      color:
+        '#858585',
+
+      fontSize:
+        13,
+    },
+
+    deviceDetailValue: {
+      color:
+        '#e6e6e6',
+
+      fontSize:
+        13,
+
+      fontWeight:
+        '600',
+
+      textTransform:
+        'capitalize',
+    },
+
+    retryButton: {
+      width:
+        '100%',
+
+      minHeight:
+        52,
+
+      marginTop:
+        24,
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+
+      borderRadius:
+        16,
+
+      backgroundColor:
+        '#ededed',
+    },
+
+    retryButtonDisabled: {
+      opacity:
+        0.65,
+    },
+
+    retryButtonText: {
+      color:
+        '#080808',
+
+      fontSize:
+        15,
+
+      fontWeight:
+        '700',
+    },
+
+    unsupportedFooter: {
+      marginTop:
+        18,
+
+      color:
+        '#707070',
+
+      fontSize:
+        11,
+
+      lineHeight:
+        17,
+
+      textAlign:
+        'center',
+    },
+  });

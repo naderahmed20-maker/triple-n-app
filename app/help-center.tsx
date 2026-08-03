@@ -1,5 +1,15 @@
-import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import {
+  useTranslation,
+} from '@/lib/i18n';
+
+import {
+  Feather,
+} from '@expo/vector-icons';
+
+import {
+  router,
+} from 'expo-router';
+
 import {
   Alert,
   Linking,
@@ -10,20 +20,126 @@ import {
   View,
 } from 'react-native';
 
+type HelpItemProps = {
+  icon: any;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+  isLast?: boolean;
+};
+
 export default function HelpCenterScreen() {
-  function show(title: string, message: string) {
-    Alert.alert(title, message);
+  const {
+    t,
+  } = useTranslation();
+
+  function show(
+    title: string,
+    message: string
+  ) {
+    Alert.alert(
+      title,
+      message
+    );
+  }
+
+  async function openLink(
+    url: string
+  ) {
+    try {
+      const supported =
+        await Linking.canOpenURL(
+          url
+        );
+
+      if (!supported) {
+        Alert.alert(
+          t(
+            'helpCenter.linkErrorTitle'
+          ),
+          t(
+            'helpCenter.linkErrorMessage'
+          )
+        );
+
+        return;
+      }
+
+      await Linking.openURL(
+        url
+      );
+    } catch (
+      error
+    ) {
+      console.log(
+        'HELP CENTER LINK ERROR:',
+        error
+      );
+
+      Alert.alert(
+        t(
+          'helpCenter.linkErrorTitle'
+        ),
+        t(
+          'helpCenter.linkErrorMessage'
+        )
+      );
+    }
+  }
+
+  function openSupportEmail() {
+    const subject =
+      encodeURIComponent(
+        t(
+          'helpCenter.supportEmailSubject'
+        )
+      );
+
+    void openLink(
+      `mailto:support@triplen.ai?subject=${subject}`
+    );
+  }
+
+  function openBugEmail() {
+    const subject =
+      encodeURIComponent(
+        t(
+          'helpCenter.bugEmailSubject'
+        )
+      );
+
+    void openLink(
+      `mailto:bugs@triplen.ai?subject=${subject}`
+    );
   }
 
   return (
     <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
+      style={
+        styles.container
+      }
+      showsVerticalScrollIndicator={
+        false
+      }
+      contentContainerStyle={
+        styles.scrollContent
+      }
     >
-      <View style={styles.content}>
+      <View
+        style={
+          styles.content
+        }
+      >
         <TouchableOpacity
-          style={styles.backIcon}
-          onPress={() => router.back()}
+          style={
+            styles.backIcon
+          }
+          onPress={() =>
+            router.back()
+          }
+          activeOpacity={
+            0.8
+          }
         >
           <Feather
             name="chevron-left"
@@ -32,58 +148,101 @@ export default function HelpCenterScreen() {
           />
         </TouchableOpacity>
 
-        <Text style={styles.title}>
-          Help Center
+        <Text
+          style={
+            styles.title
+          }
+        >
+          {t(
+            'helpCenter.title'
+          )}
         </Text>
 
-        <Text style={styles.subtitle}>
-          Everything you need to use Triple N
+        <Text
+          style={
+            styles.subtitle
+          }
+        >
+          {t(
+            'helpCenter.subtitle'
+          )}
         </Text>
 
-        <View style={styles.card}>
-
+        <View
+          style={
+            styles.card
+          }
+        >
           <HelpItem
             icon="image"
-            title="Add Clothes"
-            subtitle="Build your digital wardrobe"
+            title={t(
+              'helpCenter.addClothesTitle'
+            )}
+            subtitle={t(
+              'helpCenter.addClothesSubtitle'
+            )}
             onPress={() =>
               show(
-                'Add Clothes',
-                'Go to Wardrobe → Add Item → Choose Photo → Select Category → Save.'
+                t(
+                  'helpCenter.addClothesTitle'
+                ),
+                t(
+                  'helpCenter.addClothesMessage'
+                )
               )
             }
           />
 
           <HelpItem
             icon="cpu"
-            title="AI Outfit Suggestions"
-            subtitle="How Triple N builds outfits"
+            title={t(
+              'helpCenter.aiTitle'
+            )}
+            subtitle={t(
+              'helpCenter.aiSubtitle'
+            )}
             onPress={() =>
               show(
-                'AI Suggestions',
-                'Triple N analyzes colors, categories, weather, season and your preferences to build the best outfit.'
+                t(
+                  'helpCenter.aiAlertTitle'
+                ),
+                t(
+                  'helpCenter.aiMessage'
+                )
               )
             }
           />
 
           <HelpItem
             icon="heart"
-            title="Favorites"
-            subtitle="Save your favorite clothes"
+            title={t(
+              'helpCenter.favoritesTitle'
+            )}
+            subtitle={t(
+              'helpCenter.favoritesSubtitle'
+            )}
             onPress={() =>
               show(
-                'Favorites',
-                'Tap the ❤️ icon to save any clothing item or outfit.'
+                t(
+                  'helpCenter.favoritesTitle'
+                ),
+                t(
+                  'helpCenter.favoritesMessage'
+                )
               )
             }
           />
 
           <HelpItem
             icon="help-circle"
-            title="Frequently Asked Questions"
-            subtitle="Common questions"
+            title={t(
+              'helpCenter.faqTitle'
+            )}
+            subtitle={t(
+              'helpCenter.faqSubtitle'
+            )}
             onPress={() =>
-              Linking.openURL(
+              void openLink(
                 'https://triplen.ai/faq'
               )
             }
@@ -91,32 +250,38 @@ export default function HelpCenterScreen() {
 
           <HelpItem
             icon="mail"
-            title="Contact Support"
+            title={t(
+              'helpCenter.supportTitle'
+            )}
             subtitle="support@triplen.ai"
-            onPress={() =>
-              Linking.openURL(
-                'mailto:support@triplen.ai?subject=Triple N Support'
-              )
+            onPress={
+              openSupportEmail
             }
           />
 
           <HelpItem
             icon="alert-circle"
-            title="Report a Bug"
-            subtitle="Tell us about an issue"
-            onPress={() =>
-              Linking.openURL(
-                'mailto:bugs@triplen.ai?subject=Bug Report'
-              )
+            title={t(
+              'helpCenter.reportBugTitle'
+            )}
+            subtitle={t(
+              'helpCenter.reportBugSubtitle'
+            )}
+            onPress={
+              openBugEmail
             }
           />
 
           <HelpItem
             icon="shield"
-            title="Privacy Policy"
-            subtitle="How we protect your data"
+            title={t(
+              'helpCenter.privacyTitle'
+            )}
+            subtitle={t(
+              'helpCenter.privacySubtitle'
+            )}
             onPress={() =>
-              Linking.openURL(
+              void openLink(
                 'https://triplen.ai/privacy'
               )
             }
@@ -124,19 +289,21 @@ export default function HelpCenterScreen() {
 
           <HelpItem
             icon="file-text"
-            title="Terms of Service"
-            subtitle="Read the app terms"
+            title={t(
+              'helpCenter.termsTitle'
+            )}
+            subtitle={t(
+              'helpCenter.termsSubtitle'
+            )}
             onPress={() =>
-              Linking.openURL(
+              void openLink(
                 'https://triplen.ai/terms'
               )
             }
+            isLast
           />
-
         </View>
-
       </View>
-
     </ScrollView>
   );
 }
@@ -146,19 +313,33 @@ function HelpItem({
   title,
   subtitle,
   onPress,
-}: {
-  icon: any;
-  title: string;
-  subtitle: string;
-  onPress: () => void;
-}) {
+  isLast = false,
+}: HelpItemProps) {
   return (
     <TouchableOpacity
-      style={styles.item}
-      onPress={onPress}
+      style={[
+        styles.item,
+
+        isLast &&
+          styles.lastItem,
+      ]}
+      onPress={
+        onPress
+      }
+      activeOpacity={
+        0.75
+      }
     >
-      <View style={styles.left}>
-        <View style={styles.iconBox}>
+      <View
+        style={
+          styles.left
+        }
+      >
+        <View
+          style={
+            styles.iconBox
+          }
+        >
           <Feather
             name={icon}
             size={20}
@@ -166,12 +347,24 @@ function HelpItem({
           />
         </View>
 
-        <View>
-          <Text style={styles.itemTitle}>
+        <View
+          style={
+            styles.textBox
+          }
+        >
+          <Text
+            style={
+              styles.itemTitle
+            }
+          >
             {title}
           </Text>
 
-          <Text style={styles.itemSubtitle}>
+          <Text
+            style={
+              styles.itemSubtitle
+            }
+          >
             {subtitle}
           </Text>
         </View>
@@ -185,118 +378,112 @@ function HelpItem({
     </TouchableOpacity>
   );
 }
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#07090d',
-  },
 
-  content: {
-    padding: 24,
-    paddingTop: 62,
-    paddingBottom: 40,
-  },
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor:
+        '#07090d',
+    },
 
-  backIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#17191d',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 18,
-  },
+    scrollContent: {
+      flexGrow: 1,
+    },
 
-  title: {
-    color: 'white',
-    fontSize: 34,
-    fontWeight: '900',
-    marginBottom: 6,
-  },
+    content: {
+      padding: 24,
+      paddingTop: 62,
+      paddingBottom: 40,
+    },
 
-  subtitle: {
-    color: '#8f9299',
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 24,
-  },
+    backIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor:
+        '#17191d',
+      justifyContent:
+        'center',
+      alignItems: 'center',
+      marginBottom: 18,
+    },
 
-  card: {
-    backgroundColor: '#111318',
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: '#22252b',
-    overflow: 'hidden',
-  },
+    title: {
+      color: 'white',
+      fontSize: 34,
+      fontWeight: '900',
+      marginBottom: 6,
+    },
 
-  item: {
-    minHeight: 78,
-    paddingHorizontal: 18,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#22252b',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+    subtitle: {
+      color: '#8f9299',
+      fontSize: 15,
+      fontWeight: '700',
+      marginBottom: 24,
+    },
 
-  left: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
+    card: {
+      backgroundColor:
+        '#111318',
+      borderRadius: 26,
+      borderWidth: 1,
+      borderColor:
+        '#22252b',
+      overflow: 'hidden',
+    },
 
-  iconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 16,
-    backgroundColor: '#1b1e24',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
+    item: {
+      minHeight: 78,
+      paddingHorizontal: 18,
+      paddingVertical: 15,
+      borderBottomWidth: 1,
+      borderBottomColor:
+        '#22252b',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent:
+        'space-between',
+    },
 
-  itemTitle: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '900',
-  },
+    lastItem: {
+      borderBottomWidth: 0,
+    },
 
-  itemSubtitle: {
-    color: '#8c9099',
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 4,
-  },
+    left: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      paddingRight: 10,
+    },
 
-  itemRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+    iconBox: {
+      width: 42,
+      height: 42,
+      borderRadius: 16,
+      backgroundColor:
+        '#1b1e24',
+      justifyContent:
+        'center',
+      alignItems: 'center',
+      marginRight: 14,
+    },
 
-  arrow: {
-    color: '#777',
-    fontSize: 20,
-  },
-  chevron: {
-    color: '#777',
-    fontSize: 22,
-    fontWeight: '700',
-  },
+    textBox: {
+      flex: 1,
+    },
 
-  sectionSpacing: {
-    height: 12,
-  },
+    itemTitle: {
+      color: 'white',
+      fontSize: 16,
+      fontWeight: '900',
+    },
 
-  footer: {
-    marginTop: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  footerText: {
-    color: '#666',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-});
+    itemSubtitle: {
+      color: '#8c9099',
+      fontSize: 12,
+      fontWeight: '700',
+      marginTop: 4,
+      lineHeight: 17,
+    },
+  });

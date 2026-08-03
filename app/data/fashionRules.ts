@@ -1,6 +1,7 @@
 // app/data/fashionRules.ts
 
-export const FASHION_RULES_VERSION = 1;
+export const FASHION_RULES_VERSION =
+  1;
 
 export type StyleType =
   | 'Minimal'
@@ -15,20 +16,16 @@ export type OccasionType =
   | 'Date'
   | 'Party'
   | 'Sport'
-  | 'Summer'
-  | 'Winter';
+  | 'Summer';
 
 export type WeatherType =
   | 'Hot'
   | 'Mild'
-  | 'Cold'
   | 'Rainy';
 
 export type SeasonType =
   | 'Spring'
-  | 'Summer'
-  | 'Autumn'
-  | 'Winter';
+  | 'Summer';
 
 export type ClothingCategory =
   | 'Tops'
@@ -46,72 +43,132 @@ export type AccessoryType =
   | 'Other';
 
 export interface StyleRule {
-  requiredCategories: ClothingCategory[];
-  preferredCategories: ClothingCategory[];
-  forbiddenCategories: ClothingCategory[];
+  requiredCategories:
+    ClothingCategory[];
 
-  preferredAccessoryTypes: AccessoryType[];
+  preferredCategories:
+    ClothingCategory[];
 
-  preferredColors: string[];
-  avoidColors: string[];
+  forbiddenCategories:
+    ClothingCategory[];
 
-  preferredWeather: WeatherType[];
-  preferredSeason: SeasonType[];
+  preferredAccessoryTypes:
+    AccessoryType[];
 
-  jacketRequired: boolean;
-  maxColors: number;
-  minimumScore: number;
-  priority: number;
+  preferredColors:
+    string[];
+
+  avoidColors:
+    string[];
+
+  preferredWeather:
+    WeatherType[];
+
+  preferredSeason:
+    SeasonType[];
+
+  jacketRequired:
+    boolean;
+
+  maxColors:
+    number;
+
+  minimumScore:
+    number;
+
+  priority:
+    number;
 
   bonuses: {
-    jacket: number;
-    accessory: number;
-    favorite: number;
-    matchingColors: number;
-    perfectFit: number;
+    jacket:
+      number;
+
+    accessory:
+      number;
+
+    favorite:
+      number;
+
+    matchingColors:
+      number;
+
+    perfectFit:
+      number;
   };
 
   penalties: {
-    wrongColor: number;
-    tooManyColors: number;
-    forbiddenCategory: number;
-    missingCategory: number;
-    wrongSeason: number;
-    wrongWeather: number;
+    wrongColor:
+      number;
+
+    tooManyColors:
+      number;
+
+    forbiddenCategory:
+      number;
+
+    missingCategory:
+      number;
+
+    wrongSeason:
+      number;
+
+    wrongWeather:
+      number;
   };
 }
 
 export interface OccasionRule {
-  requiredCategories: ClothingCategory[];
-  forbiddenCategories: ClothingCategory[];
+  requiredCategories:
+    ClothingCategory[];
 
-  jacketRequired: boolean;
+  forbiddenCategories:
+    ClothingCategory[];
 
-  preferredStyles: StyleType[];
-  preferredColors: string[];
+  jacketRequired:
+    boolean;
 
-  minimumScore: number;
+  preferredStyles:
+    StyleType[];
+
+  preferredColors:
+    string[];
+
+  minimumScore:
+    number;
 }
 
 export interface WeatherRule {
-  jacketRequired: boolean;
+  jacketRequired:
+    boolean;
 
-  preferredColors: string[];
-  forbiddenColors: string[];
+  preferredColors:
+    string[];
 
-  preferredCategories: ClothingCategory[];
-  forbiddenCategories: ClothingCategory[];
+  forbiddenColors:
+    string[];
 
-  bonus: number;
+  preferredCategories:
+    ClothingCategory[];
+
+  forbiddenCategories:
+    ClothingCategory[];
+
+  bonus:
+    number;
 }
 
 export interface SeasonRule {
-  preferredColors: string[];
-  forbiddenColors: string[];
+  preferredColors:
+    string[];
 
-  preferredCategories: ClothingCategory[];
+  forbiddenColors:
+    string[];
 
-  bonus: number;
+  preferredCategories:
+    ClothingCategory[];
+
+  bonus:
+    number;
 }
 
 export const CATEGORY_RULES = {
@@ -148,20 +205,30 @@ export const CATEGORY_RULES = {
 
 export const SCORE_RULES = {
   colorWeight: 30,
+
   styleWeight: 20,
+
   occasionWeight: 15,
+
   weatherWeight: 10,
+
   seasonWeight: 10,
+
   preferenceWeight: 10,
+
   accessoryWeight: 5,
 
   favoriteBonus: 5,
 
   perfectScore: 100,
+
   minimumOverallScore: 75,
 } as const;
 
-export const STYLE_RULES: Record<StyleType, StyleRule> = {
+export const STYLE_RULES: Record<
+  StyleType,
+  StyleRule
+> = {
   Minimal: {
     requiredCategories: [
       'Tops',
@@ -198,35 +265,49 @@ export const STYLE_RULES: Record<StyleType, StyleRule> = {
     preferredWeather: [
       'Hot',
       'Mild',
-      'Cold',
+      'Rainy',
     ],
 
     preferredSeason: [
       'Spring',
       'Summer',
-      'Autumn',
-      'Winter',
     ],
 
-    jacketRequired: false,
-    maxColors: 3,
-    minimumScore: 78,
-    priority: 5,
+    jacketRequired:
+      false,
+
+    maxColors:
+      3,
+
+    minimumScore:
+      78,
+
+    priority:
+      5,
 
     bonuses: {
       jacket: 4,
+
       accessory: 8,
+
       favorite: 5,
+
       matchingColors: 15,
+
       perfectFit: 20,
     },
 
     penalties: {
       wrongColor: 15,
+
       tooManyColors: 25,
+
       forbiddenCategory: 45,
+
       missingCategory: 40,
+
       wrongSeason: 8,
+
       wrongWeather: 10,
     },
   },
@@ -268,34 +349,49 @@ export const STYLE_RULES: Record<StyleType, StyleRule> = {
 
     preferredWeather: [
       'Mild',
-      'Cold',
+      'Rainy',
     ],
 
     preferredSeason: [
       'Spring',
-      'Autumn',
-      'Winter',
+      'Summer',
     ],
 
-    jacketRequired: false,
-    maxColors: 3,
-    minimumScore: 82,
-    priority: 7,
+    jacketRequired:
+      false,
+
+    maxColors:
+      3,
+
+    minimumScore:
+      82,
+
+    priority:
+      7,
 
     bonuses: {
       jacket: 18,
+
       accessory: 12,
+
       favorite: 5,
+
       matchingColors: 20,
+
       perfectFit: 25,
     },
 
     penalties: {
       wrongColor: 20,
+
       tooManyColors: 30,
+
       forbiddenCategory: 50,
+
       missingCategory: 40,
+
       wrongSeason: 12,
+
       wrongWeather: 15,
     },
   },
@@ -338,33 +434,49 @@ export const STYLE_RULES: Record<StyleType, StyleRule> = {
 
     preferredWeather: [
       'Mild',
-      'Cold',
+      'Rainy',
     ],
 
     preferredSeason: [
-      'Autumn',
-      'Winter',
+      'Spring',
+      'Summer',
     ],
 
-    jacketRequired: false,
-    maxColors: 3,
-    minimumScore: 85,
-    priority: 10,
+    jacketRequired:
+      false,
+
+    maxColors:
+      3,
+
+    minimumScore:
+      85,
+
+    priority:
+      10,
 
     bonuses: {
       jacket: 25,
+
       accessory: 18,
+
       favorite: 8,
+
       matchingColors: 25,
+
       perfectFit: 30,
     },
 
     penalties: {
       wrongColor: 25,
+
       tooManyColors: 35,
+
       forbiddenCategory: 55,
+
       missingCategory: 45,
+
       wrongSeason: 18,
+
       wrongWeather: 20,
     },
   },
@@ -402,34 +514,49 @@ export const STYLE_RULES: Record<StyleType, StyleRule> = {
     preferredWeather: [
       'Hot',
       'Mild',
-      'Cold',
+      'Rainy',
     ],
 
     preferredSeason: [
       'Spring',
       'Summer',
-      'Autumn',
     ],
 
-    jacketRequired: false,
-    maxColors: 5,
-    minimumScore: 72,
-    priority: 6,
+    jacketRequired:
+      false,
+
+    maxColors:
+      5,
+
+    minimumScore:
+      72,
+
+    priority:
+      6,
 
     bonuses: {
       jacket: 10,
+
       accessory: 15,
+
       favorite: 5,
+
       matchingColors: 15,
+
       perfectFit: 18,
     },
 
     penalties: {
       wrongColor: 8,
+
       tooManyColors: 10,
+
       forbiddenCategory: 35,
+
       missingCategory: 25,
+
       wrongSeason: 8,
+
       wrongWeather: 10,
     },
   },
@@ -475,25 +602,41 @@ export const STYLE_RULES: Record<StyleType, StyleRule> = {
       'Summer',
     ],
 
-    jacketRequired: false,
-    maxColors: 4,
-    minimumScore: 72,
-    priority: 5,
+    jacketRequired:
+      false,
+
+    maxColors:
+      4,
+
+    minimumScore:
+      72,
+
+    priority:
+      5,
 
     bonuses: {
       jacket: -10,
+
       accessory: 8,
+
       favorite: 5,
+
       matchingColors: 15,
+
       perfectFit: 18,
     },
 
     penalties: {
       wrongColor: 10,
+
       tooManyColors: 15,
+
       forbiddenCategory: 45,
+
       missingCategory: 30,
+
       wrongSeason: 10,
+
       wrongWeather: 12,
     },
   },
@@ -512,7 +655,8 @@ export const OCCASION_RULES: Record<
 
     forbiddenCategories: [],
 
-    jacketRequired: false,
+    jacketRequired:
+      false,
 
     preferredStyles: [
       'Minimal',
@@ -529,7 +673,8 @@ export const OCCASION_RULES: Record<
       'Beige',
     ],
 
-    minimumScore: 68,
+    minimumScore:
+      68,
   },
 
   Work: {
@@ -541,7 +686,8 @@ export const OCCASION_RULES: Record<
 
     forbiddenCategories: [],
 
-    jacketRequired: false,
+    jacketRequired:
+      false,
 
     preferredStyles: [
       'Classic',
@@ -557,7 +703,8 @@ export const OCCASION_RULES: Record<
       'Beige',
     ],
 
-    minimumScore: 80,
+    minimumScore:
+      80,
   },
 
   Date: {
@@ -569,7 +716,8 @@ export const OCCASION_RULES: Record<
 
     forbiddenCategories: [],
 
-    jacketRequired: false,
+    jacketRequired:
+      false,
 
     preferredStyles: [
       'Luxury',
@@ -587,7 +735,8 @@ export const OCCASION_RULES: Record<
       'Red',
     ],
 
-    minimumScore: 80,
+    minimumScore:
+      80,
   },
 
   Party: {
@@ -599,7 +748,8 @@ export const OCCASION_RULES: Record<
 
     forbiddenCategories: [],
 
-    jacketRequired: false,
+    jacketRequired:
+      false,
 
     preferredStyles: [
       'Luxury',
@@ -614,7 +764,8 @@ export const OCCASION_RULES: Record<
       'Navy',
     ],
 
-    minimumScore: 78,
+    minimumScore:
+      78,
   },
 
   Sport: {
@@ -628,7 +779,8 @@ export const OCCASION_RULES: Record<
       'Jackets',
     ],
 
-    jacketRequired: false,
+    jacketRequired:
+      false,
 
     preferredStyles: [
       'Sport',
@@ -641,7 +793,8 @@ export const OCCASION_RULES: Record<
       'Gray',
     ],
 
-    minimumScore: 70,
+    minimumScore:
+      70,
   },
 
   Summer: {
@@ -655,7 +808,8 @@ export const OCCASION_RULES: Record<
       'Jackets',
     ],
 
-    jacketRequired: false,
+    jacketRequired:
+      false,
 
     preferredStyles: [
       'Minimal',
@@ -671,36 +825,8 @@ export const OCCASION_RULES: Record<
       'Green',
     ],
 
-    minimumScore: 70,
-  },
-
-  Winter: {
-    requiredCategories: [
-      'Tops',
-      'Bottoms',
-      'Shoes',
-      'Jackets',
-    ],
-
-    forbiddenCategories: [],
-
-    jacketRequired: true,
-
-    preferredStyles: [
-      'Classic',
-      'Luxury',
-      'Streetwear',
-    ],
-
-    preferredColors: [
-      'Black',
-      'Gray',
-      'Brown',
-      'Navy',
-      'Beige',
-    ],
-
-    minimumScore: 80,
+    minimumScore:
+      70,
   },
 };
 
@@ -709,7 +835,8 @@ export const WEATHER_RULES: Record<
   WeatherRule
 > = {
   Hot: {
-    jacketRequired: false,
+    jacketRequired:
+      false,
 
     preferredColors: [
       'White',
@@ -731,11 +858,13 @@ export const WEATHER_RULES: Record<
       'Jackets',
     ],
 
-    bonus: 15,
+    bonus:
+      15,
   },
 
   Mild: {
-    jacketRequired: false,
+    jacketRequired:
+      false,
 
     preferredColors: [
       'Black',
@@ -757,36 +886,13 @@ export const WEATHER_RULES: Record<
 
     forbiddenCategories: [],
 
-    bonus: 10,
-  },
-
-  Cold: {
-    jacketRequired: true,
-
-    preferredColors: [
-      'Black',
-      'Gray',
-      'Brown',
-      'Navy',
-      'Beige',
-    ],
-
-    forbiddenColors: [],
-
-    preferredCategories: [
-      'Tops',
-      'Bottoms',
-      'Shoes',
-      'Jackets',
-    ],
-
-    forbiddenCategories: [],
-
-    bonus: 20,
+    bonus:
+      10,
   },
 
   Rainy: {
-    jacketRequired: true,
+    jacketRequired:
+      false,
 
     preferredColors: [
       'Black',
@@ -808,7 +914,8 @@ export const WEATHER_RULES: Record<
 
     forbiddenCategories: [],
 
-    bonus: 25,
+    bonus:
+      25,
   },
 };
 
@@ -834,7 +941,8 @@ export const SEASON_RULES: Record<
       'Jackets',
     ],
 
-    bonus: 10,
+    bonus:
+      10,
   },
 
   Summer: {
@@ -854,49 +962,7 @@ export const SEASON_RULES: Record<
       'Shoes',
     ],
 
-    bonus: 15,
-  },
-
-  Autumn: {
-    preferredColors: [
-      'Brown',
-      'Beige',
-      'Gray',
-      'Black',
-      'Green',
-      'Navy',
-    ],
-
-    forbiddenColors: [],
-
-    preferredCategories: [
-      'Tops',
-      'Bottoms',
-      'Shoes',
-      'Jackets',
-    ],
-
-    bonus: 15,
-  },
-
-  Winter: {
-    preferredColors: [
-      'Black',
-      'Gray',
-      'Brown',
-      'Navy',
-      'Beige',
-    ],
-
-    forbiddenColors: [],
-
-    preferredCategories: [
-      'Tops',
-      'Bottoms',
-      'Shoes',
-      'Jackets',
-    ],
-
-    bonus: 20,
+    bonus:
+      15,
   },
 };

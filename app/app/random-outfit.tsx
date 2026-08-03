@@ -1,6 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+
+import {
+  router,
+  useFocusEffect,
+} from 'expo-router';
+
+import {
+  useCallback,
+  useState,
+} from 'react';
+
 import {
   ActivityIndicator,
   Alert,
@@ -11,97 +20,244 @@ import {
   View,
 } from 'react-native';
 
-import { saveOutfit as saveOutfitToSupabase } from '@/lib/outfitService';
+import { useTranslation } from '@/lib/i18n';
+
+import {
+  saveOutfit as saveOutfitToSupabase,
+} from '@/lib/outfitService';
+
 import {
   getCurrentUser,
   getMyWardrobeItems,
 } from '@/lib/wardrobeService';
 
 import {
-  AppWeatherContext,
+  type AppWeatherContext,
+  formatTemperature,
+  loadTemperatureUnit,
   loadWeatherContext,
+  type TemperatureUnit,
 } from '../data/appContext';
 
 import {
-  FashionEngineResult,
-  FashionItem,
-  getFashionOutfitResult,
-  ScoredFashionOutfit,
+  type FashionEngineResult,
+  type FashionItem,
+  pickSmartFashionOutfit,
+  type ScoredFashionOutfit,
 } from '../data/fashionEngine';
 
 import {
-  SeasonType,
-  StyleType,
-  WeatherType,
+  type SeasonType,
+  type StyleType,
+  type WeatherType,
 } from '../data/fashionRules';
 
 import OutfitCanvas from './components/OutfitCanvas';
 
-const SETTINGS_KEY = 'TRIPLE_N_SETTINGS';
+const SETTINGS_KEY =
+  'TRIPLE_N_SETTINGS';
 
-const VALID_STYLES: StyleType[] = [
-  'Minimal',
-  'Classic',
-  'Luxury',
-  'Streetwear',
-  'Sport',
-];
+const SUMMER_SEASON:
+  SeasonType =
+  'Summer';
 
-export default function RandomOutfitScreen() {
-  const [items, setItems] = useState<FashionItem[]>([]);
+const VALID_STYLES:
+  StyleType[] = [
+    'Minimal',
+    'Classic',
+    'Luxury',
+    'Streetwear',
+    'Sport',
+  ];
 
-  const [stylePreference, setStylePreference] =
-    useState<StyleType>('Minimal');
+type AccessoryPromptStep =
+  | 'hidden'
+  | 'chooseAccessory'
+  | 'chooseBagType'
+  | 'askForBag'
+  | 'askForCap';
 
-  const [appContext, setAppContext] =
-    useState<AppWeatherContext | null>(null);
+export default function SmartSuggestionScreen() {
+  const {
+    t,
+    language,
+  } = useTranslation();
 
-  const [engineResult, setEngineResult] =
-    useState<FashionEngineResult | null>(null);
+  const [
+    items,
+    setItems,
+  ] = useState<
+    FashionItem[]
+  >([]);
 
-  const [selectedOutfit, setSelectedOutfit] =
-    useState<ScoredFashionOutfit | null>(null);
+  const [
+    appContext,
+    setAppContext,
+  ] =
+    useState<AppWeatherContext | null>(
+      null
+    );
 
-  const [lastIndex, setLastIndex] = useState(-1);
+  const [
+    temperatureUnit,
+    setTemperatureUnit,
+  ] =
+    useState<TemperatureUnit>(
+      '°C'
+    );
 
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [
+    stylePreference,
+    setStylePreference,
+  ] =
+    useState<StyleType>(
+      'Minimal'
+    );
+
+  const [
+    engineResult,
+    setEngineResult,
+  ] =
+    useState<FashionEngineResult | null>(
+      null
+    );
+
+  const [
+    selectedOutfit,
+    setSelectedOutfit,
+  ] =
+    useState<ScoredFashionOutfit | null>(
+      null
+    );
+
+  const [
+    currentIndex,
+    setCurrentIndex,
+  ] =
+    useState(0);
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(true);
+
+  const [
+    saving,
+    setSaving,
+  ] =
+    useState(false);
+
+  const [
+    accessoryPromptStep,
+    setAccessoryPromptStep,
+  ] =
+    useState<AccessoryPromptStep>(
+      'hidden'
+    );
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
 
-      async function loadData() {
+      async function init() {
         setLoading(true);
 
         try {
-          const user = await getCurrentUser();
+          const user =
+            await getCurrentUser();
 
           if (!user) {
-            router.replace('/login' as any);
+            router.replace(
+              '/login' as any
+            );
+
             return;
           }
 
-          const [wardrobe, context, savedStyle] =
+          const [
+            context,
+            savedStyle,
+            savedUnit,
+            wardrobe,
+          ] =
             await Promise.all([
-              getMyWardrobeItems(),
               loadWeatherContext(),
-              loadStylePreference(),
+              getStylePreference(),
+              loadTemperatureUnit(),
+              getMyWardrobeItems(),
             ]);
 
-          if (!active) return;
+          if (!active) {
+            return;
+          }
 
-          setItems(wardrobe as FashionItem[]);
-          setAppContext(context);
-          setStylePreference(savedStyle);
-          setEngineResult(null);
-          setSelectedOutfit(null);
-          setLastIndex(-1);
-        } catch (error: any) {
+          const wardrobeItems =
+            wardrobe as
+              FashionItem[];
+
+          setItems(
+            wardrobeItems
+          );
+
+          setAppContext(
+            context
+          );
+
+          setStylePreference(
+            savedStyle
+          );
+
+          setTemperatureUnit(
+            savedUnit
+          );
+
+          const result =
+            buildSmartResult(
+              wardrobeItems,
+              savedStyle,
+              context
+            );
+
+          if (!active) {
+            return;
+          }
+
+          setEngineResult(
+            result
+          );
+
+          const preparedOutfit =
+            prepareOutfitForAccessoryChoice(
+              result.bestOutfit
+            );
+
+          setSelectedOutfit(
+            preparedOutfit
+          );
+
+          setCurrentIndex(
+            0
+          );
+
+          setAccessoryPromptStep(
+            preparedOutfit
+              ? 'chooseAccessory'
+              : 'hidden'
+          );
+        } catch (
+          error: any
+        ) {
+          if (!active) {
+            return;
+          }
+
           Alert.alert(
-            'Error',
-            error?.message || 'Failed to load wardrobe.'
+            t('common.error'),
+            error?.message ||
+              t(
+                'smartSuggestion.loadFailed'
+              )
           );
         } finally {
           if (active) {
@@ -110,28 +266,42 @@ export default function RandomOutfitScreen() {
         }
       }
 
-      loadData();
+      void init();
 
       return () => {
         active = false;
       };
-    }, [])
+    }, [
+      t,
+      language,
+    ])
   );
 
-  async function loadStylePreference(): Promise<StyleType> {
+  async function getStylePreference():
+    Promise<StyleType> {
     try {
-      const savedSettings = await AsyncStorage.getItem(
-        SETTINGS_KEY
-      );
+      const savedSettings =
+        await AsyncStorage.getItem(
+          SETTINGS_KEY
+        );
 
       if (!savedSettings) {
         return 'Minimal';
       }
 
-      const settings = JSON.parse(savedSettings);
-      const savedStyle = settings.stylePreference;
+      const settings =
+        JSON.parse(
+          savedSettings
+        );
 
-      if (VALID_STYLES.includes(savedStyle)) {
+      const savedStyle =
+        settings.stylePreference;
+
+      if (
+        VALID_STYLES.includes(
+          savedStyle
+        )
+      ) {
         return savedStyle;
       }
 
@@ -141,171 +311,676 @@ export default function RandomOutfitScreen() {
     }
   }
 
-  function getWeatherType(
-    context?: AppWeatherContext | null
-  ): WeatherType | undefined {
-    if (!context) return undefined;
-
-    const weather =
-      context.weather?.trim().toLowerCase() || '';
-
-    if (weather.includes('rain')) {
-      return 'Rainy';
+  function translateStyle(
+    value: StyleType
+  ) {
+    if (
+      language !== 'Italian'
+    ) {
+      return value;
     }
+
+    switch (value) {
+      case 'Classic':
+        return 'Classico';
+
+      case 'Luxury':
+        return 'Lusso';
+
+      case 'Sport':
+        return 'Sportivo';
+
+      case 'Streetwear':
+        return 'Streetwear';
+
+      case 'Minimal':
+      default:
+        return 'Minimal';
+    }
+  }
+
+  function translateWeather(
+    value: WeatherType
+  ) {
+    switch (value) {
+      case 'Hot':
+        return t(
+          'weather.hot'
+        );
+
+      case 'Mild':
+      default:
+        return t(
+          'weather.mild'
+        );
+    }
+  }
+
+  function normalizeAccessoryText(
+    value?:
+      | string
+      | null
+  ) {
+    return (
+      value || ''
+    )
+      .trim()
+      .toLowerCase()
+      .replace(
+        /[_-]/g,
+        ' '
+      )
+      .replace(
+        /\s+/g,
+        ' '
+      );
+  }
+
+  function isAccessoryType(
+    item:
+      | FashionItem
+      | null
+      | undefined,
+
+    type:
+      | 'Backpack'
+      | 'Handbag'
+      | 'Cap'
+      | 'Watch'
+  ) {
+    if (!item) {
+      return false;
+    }
+
+    const category =
+      normalizeAccessoryText(
+        item.category
+      );
+
+    const subCategory =
+      normalizeAccessoryText(
+        item.subCategory
+      );
+
+    const normalizedType =
+      normalizeAccessoryText(
+        type
+      );
+
+    if (
+      normalizedType ===
+      'handbag'
+    ) {
+      return (
+        subCategory ===
+          'handbag' ||
+        subCategory ===
+          'bag' ||
+        category ===
+          'bags' ||
+        category ===
+          'bag'
+      );
+    }
+
+    return (
+      subCategory ===
+      normalizedType
+    );
+  }
+
+  function prepareOutfitForAccessoryChoice(
+    scoredOutfit:
+      ScoredFashionOutfit | null
+  ) {
+    if (!scoredOutfit) {
+      return null;
+    }
+
+    const existingAccessory =
+      scoredOutfit
+        .outfit
+        .accessory;
+
+    const watch =
+      scoredOutfit
+        .outfit
+        .watch ||
+      (
+        isAccessoryType(
+          existingAccessory,
+          'Watch'
+        )
+          ? existingAccessory
+          : null
+      );
+
+    return {
+      ...scoredOutfit,
+
+      outfit: {
+        ...scoredOutfit.outfit,
+
+        /**
+         * Summer V1:
+         * لا نسمح بإضافة جاكيت
+         * إلى الطقم الذكي.
+         */
+        jacket:
+          null,
+
+        watch,
+
+        bag:
+          null,
+
+        cap:
+          null,
+
+        accessory:
+          null,
+      },
+    };
+  }
+
+  function addAccessoryToOutfit(
+    type:
+      | 'Backpack'
+      | 'Handbag'
+      | 'Cap'
+  ) {
+    if (!selectedOutfit) {
+      return;
+    }
+
+    const matchingItems =
+      items.filter(
+        (item) =>
+          isAccessoryType(
+            item,
+            type
+          )
+      );
+
+    if (
+      matchingItems.length ===
+      0
+    ) {
+      Alert.alert(
+        t('common.error'),
+
+        language ===
+        'Italian'
+          ? type ===
+            'Backpack'
+            ? 'Non hai uno zaino nel guardaroba.'
+            : type ===
+                'Handbag'
+              ? 'Non hai una borsa nel guardaroba.'
+              : 'Non hai un cappellino nel guardaroba.'
+          : type ===
+              'Backpack'
+            ? "You don't have a backpack in your wardrobe."
+            : type ===
+                'Handbag'
+              ? "You don't have a handbag in your wardrobe."
+              : "You don't have a cap in your wardrobe."
+      );
+
+      return;
+    }
+
+    const selectedItem =
+      matchingItems[
+        Math.floor(
+          Math.random() *
+            matchingItems.length
+        )
+      ];
+
+    const hasBag =
+      Boolean(
+        selectedOutfit
+          .outfit
+          .bag
+      );
+
+    const hasCap =
+      Boolean(
+        selectedOutfit
+          .outfit
+          .cap
+      );
+
+    setSelectedOutfit(
+      (current) => {
+        if (!current) {
+          return current;
+        }
+
+        return {
+          ...current,
+
+          outfit:
+            type === 'Cap'
+              ? {
+                  ...current.outfit,
+
+                  jacket:
+                    null,
+
+                  cap:
+                    selectedItem,
+                }
+              : {
+                  ...current.outfit,
+
+                  jacket:
+                    null,
+
+                  bag:
+                    selectedItem,
+                },
+        };
+      }
+    );
+
+    if (
+      type === 'Cap'
+    ) {
+      setAccessoryPromptStep(
+        hasBag
+          ? 'hidden'
+          : 'askForBag'
+      );
+    } else {
+      setAccessoryPromptStep(
+        hasCap
+          ? 'hidden'
+          : 'askForCap'
+      );
+    }
+  }
+
+  function replaceValue(
+    text: string,
+    key: string,
+    value:
+      | string
+      | number
+  ) {
+    return text.replace(
+      `{{${key}}}`,
+      String(value)
+    );
+  }
+
+  function replaceTwoValues(
+    text: string,
+    firstKey: string,
+    firstValue:
+      | string
+      | number,
+    secondKey: string,
+    secondValue:
+      | string
+      | number
+  ) {
+    return text
+      .replace(
+        `{{${firstKey}}}`,
+        String(
+          firstValue
+        )
+      )
+      .replace(
+        `{{${secondKey}}}`,
+        String(
+          secondValue
+        )
+      );
+  }
+
+  /**
+   * Summer V1:
+   *
+   * النظام لا يولّد أطقم Cold أو Rainy.
+   * درجة الحرارة المرتفعة تُعامل Hot،
+   * وكل الحالات الأخرى تُعامل Mild.
+   */
+  function getWeatherType(
+    context:
+      AppWeatherContext
+  ): WeatherType {
+    const weather =
+      context.weather
+        ?.trim()
+        .toLowerCase() ||
+      '';
 
     if (
       weather === 'hot' ||
-      context.temperature >= 28
+      weather.includes(
+        'sunny'
+      ) ||
+      weather.includes(
+        'clear'
+      ) ||
+      context.temperature >=
+        28
     ) {
       return 'Hot';
-    }
-
-    if (
-      weather === 'cold' ||
-      context.temperature <= 14
-    ) {
-      return 'Cold';
     }
 
     return 'Mild';
   }
 
-  function buildResult() {
-    const weather = getWeatherType(appContext);
+  function buildSmartResult(
+    wardrobe:
+      FashionItem[],
 
-    return getFashionOutfitResult(items, {
-      style: stylePreference,
-      weather,
-      season: appContext?.season as SeasonType | undefined,
-      limit: 20,
-      maxEvaluations: 50000,
-    });
+    style:
+      StyleType,
+
+    context:
+      AppWeatherContext
+  ): FashionEngineResult {
+    return pickSmartFashionOutfit(
+      wardrobe,
+      style,
+      getWeatherType(
+        context
+      ),
+      SUMMER_SEASON,
+      language
+    );
   }
 
-  function chooseRandomIndex(length: number) {
-    if (length <= 1) return 0;
-
-    let nextIndex = Math.floor(Math.random() * length);
-
-    while (nextIndex === lastIndex) {
-      nextIndex = Math.floor(Math.random() * length);
-    }
-
-    return nextIndex;
-  }
-
-  function generateRandomOutfit() {
-    if (generating) return;
-
-    setGenerating(true);
-
-    try {
-      const result = buildResult();
-
-      setEngineResult(result);
-
-      if (result.suitableOutfits.length === 0) {
-        setSelectedOutfit(null);
-        setLastIndex(-1);
-        return;
-      }
-
-      const randomIndex = chooseRandomIndex(
-        result.suitableOutfits.length
-      );
-
-      setLastIndex(randomIndex);
-
-      setSelectedOutfit(
-        result.suitableOutfits[randomIndex]
-      );
-    } catch (error: any) {
-      Alert.alert(
-        'Error',
-        error?.message || 'Failed to generate outfit.'
-      );
-    } finally {
-      setGenerating(false);
-    }
-  }
-
-  async function saveOutfit() {
-    if (!selectedOutfit || saving) {
-      Alert.alert(
-        'No outfit',
-        'Generate an outfit first.'
-      );
+  function generateAgain() {
+    if (
+      !engineResult ||
+      engineResult
+        .suitableOutfits
+        .length <= 1
+    ) {
       return;
     }
 
-    const outfit = selectedOutfit.outfit;
+    const nextIndex =
+      (
+        currentIndex +
+        1
+      ) %
+      engineResult
+        .suitableOutfits
+        .length;
 
-    const isDressOutfit =
-      outfit.top?.category === 'Dresses' ||
-      outfit.top?.category === 'Dress';
+    setCurrentIndex(
+      nextIndex
+    );
+
+    const preparedOutfit =
+      prepareOutfitForAccessoryChoice(
+        engineResult
+          .suitableOutfits[
+          nextIndex
+        ]
+      );
+
+    setSelectedOutfit(
+      preparedOutfit
+    );
+
+    setAccessoryPromptStep(
+      preparedOutfit
+        ? 'chooseAccessory'
+        : 'hidden'
+    );
+  }
+
+  async function refreshSuggestion() {
+    if (loading) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const context =
+        appContext ||
+        (
+          await loadWeatherContext()
+        );
+
+      const savedStyle =
+        await getStylePreference();
+
+      const wardrobe =
+        items.length > 0
+          ? items
+          : (
+              await getMyWardrobeItems()
+            ) as FashionItem[];
+
+      const result =
+        buildSmartResult(
+          wardrobe,
+          savedStyle,
+          context
+        );
+
+      setItems(
+        wardrobe
+      );
+
+      setAppContext(
+        context
+      );
+
+      setStylePreference(
+        savedStyle
+      );
+
+      setEngineResult(
+        result
+      );
+
+      const preparedOutfit =
+        prepareOutfitForAccessoryChoice(
+          result.bestOutfit
+        );
+
+      setSelectedOutfit(
+        preparedOutfit
+      );
+
+      setCurrentIndex(
+        0
+      );
+
+      setAccessoryPromptStep(
+        preparedOutfit
+          ? 'chooseAccessory'
+          : 'hidden'
+      );
+    } catch (
+      error: any
+    ) {
+      Alert.alert(
+        t('common.error'),
+        error?.message ||
+          t(
+            'smartSuggestion.refreshFailed'
+          )
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function saveSmartOutfit() {
+    if (
+      !selectedOutfit ||
+      saving
+    ) {
+      Alert.alert(
+        t(
+          'outfit.noOutfit'
+        ),
+        t(
+          'smartSuggestion.noOutfitToSave'
+        )
+      );
+
+      return;
+    }
+
+    const outfit =
+      selectedOutfit.outfit;
 
     const bottom =
-      outfit.bottom || outfit.pants || null;
+      outfit.bottom ||
+      outfit.pants ||
+      null;
+
+    const isDressOutfit =
+      outfit.top?.category ===
+        'Dresses' ||
+      outfit.top?.category ===
+        'Dress';
 
     if (
       !outfit.top ||
       !outfit.shoes ||
-      (!isDressOutfit && !bottom)
+      (
+        !isDressOutfit &&
+        !bottom
+      )
     ) {
       Alert.alert(
-        'No outfit',
-        'Generate a complete outfit first.'
+        t(
+          'outfit.noOutfit'
+        ),
+        t(
+          'outfit.completeFirst'
+        )
       );
+
       return;
     }
 
     setSaving(true);
 
     try {
-      await saveOutfitToSupabase({
-        top: outfit.top,
-        pants: bottom,
-        bottom,
-        shoes: outfit.shoes,
-        jacket: outfit.jacket,
-        accessory: outfit.accessory,
+      const context =
+        appContext ||
+        (
+          await loadWeatherContext()
+        );
 
-        score: selectedOutfit.score,
-        aiScore: selectedOutfit.score,
+      await saveOutfitToSupabase({
+        top:
+          outfit.top,
+
+        pants:
+          bottom,
+
+        bottom,
+
+        shoes:
+          outfit.shoes,
+
+        /**
+         * Summer V1:
+         * لا يتم حفظ أي جاكيت.
+         */
+        jacket:
+          null,
+
+        bag:
+          outfit.bag,
+
+        cap:
+          outfit.cap,
+
+        watch:
+          outfit.watch,
+
+        accessory:
+          outfit.accessory,
+
+        score:
+          selectedOutfit.score,
+
+        aiScore:
+          selectedOutfit.score,
 
         colorScore:
-          selectedOutfit.breakdown.color,
-
-        styleScore:
-          selectedOutfit.breakdown.style,
+          selectedOutfit
+            .breakdown
+            .color,
 
         weatherScore:
-          selectedOutfit.breakdown.weather,
+          selectedOutfit
+            .breakdown
+            .weather,
 
         seasonScore:
-          selectedOutfit.breakdown.season,
+          selectedOutfit
+            .breakdown
+            .season,
+
+        styleScore:
+          selectedOutfit
+            .breakdown
+            .style,
 
         explanation:
-          selectedOutfit.reasons.length > 0
-            ? selectedOutfit.reasons
+          selectedOutfit
+            .reasons
+            .length > 0
+            ? selectedOutfit
+                .reasons
             : [
-                `Generated from Surprise Me.`,
-                `Style preference: ${stylePreference}.`,
+                language ===
+                'Italian'
+                  ? `Generato per lo stile ${translateStyle(
+                      stylePreference
+                    )}.`
+                  : `Generated for the ${stylePreference} style.`,
               ],
 
-        occasion: 'Casual',
-        weather: appContext?.weather,
-        season: appContext?.season,
+        occasion:
+          'Smart',
+
+        weather:
+          getWeatherType(
+            context
+          ),
+
+        season:
+          SUMMER_SEASON,
       });
 
       Alert.alert(
-        'Saved',
-        'Outfit saved successfully.'
+        t(
+          'common.saved'
+        ),
+        t(
+          'smartSuggestion.saved'
+        )
       );
-    } catch (error: any) {
+    } catch (
+      error: any
+    ) {
       Alert.alert(
-        'Save failed',
-        error?.message || 'Something went wrong.'
+        t(
+          'outfit.saveFailed'
+        ),
+        error?.message ||
+          t(
+            'outfit.saveFailedMessage'
+          )
       );
     } finally {
       setSaving(false);
@@ -313,21 +988,40 @@ export default function RandomOutfitScreen() {
   }
 
   const displayOutfit =
-    selectedOutfit?.outfit || null;
+    selectedOutfit
+      ?.outfit ||
+    null;
 
   const breakdown =
-    selectedOutfit?.breakdown || null;
+    selectedOutfit
+      ?.breakdown ||
+    null;
+
+  const suitableOutfits =
+    engineResult
+      ?.suitableOutfits ||
+    [];
 
   if (loading) {
     return (
-      <View style={styles.loadingScreen}>
+      <View
+        style={
+          styles.loadingScreen
+        }
+      >
         <ActivityIndicator
           size="large"
           color="#f1d8c2"
         />
 
-        <Text style={styles.loadingText}>
-          Triple N is analyzing your wardrobe...
+        <Text
+          style={
+            styles.loadingText
+          }
+        >
+          {t(
+            'smartSuggestion.loading'
+          )}
         </Text>
       </View>
     );
@@ -335,137 +1029,702 @@ export default function RandomOutfitScreen() {
 
   return (
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
+      style={
+        styles.container
+      }
+      contentContainerStyle={
+        styles.content
+      }
+      showsVerticalScrollIndicator={
+        false
+      }
     >
-      <View style={styles.header}>
+      <View
+        style={
+          styles.header
+        }
+      >
         <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
+          style={
+            styles.backIcon
+          }
+          onPress={() =>
+            router.back()
+          }
         >
-          <Text style={styles.backText}>‹</Text>
+          <Text
+            style={
+              styles.backIconText
+            }
+          >
+            ‹
+          </Text>
         </TouchableOpacity>
 
-        <View style={styles.headerText}>
-          <Text style={styles.title}>
-            Surprise Me
+        <View
+          style={
+            styles.headerText
+          }
+        >
+          <Text
+            style={
+              styles.title
+            }
+          >
+            {t(
+              'smartSuggestion.title'
+            )}
           </Text>
 
-          <Text style={styles.subtitle}>
-            A smart surprise from your best outfits.
+          <Text
+            style={
+              styles.subtitle
+            }
+          >
+            {t(
+              'smartSuggestion.subtitle'
+            )}
           </Text>
         </View>
       </View>
 
-      <View style={styles.infoCard}>
-        <Text style={styles.infoEmoji}>🎲</Text>
-
-        <Text style={styles.infoTitle}>
-          {stylePreference} Surprise
-        </Text>
-
-        <Text style={styles.infoText}>
-          Triple N chooses randomly from your strongest
-          matching outfits.
-        </Text>
-
-        {appContext && (
-          <Text style={styles.contextText}>
-            {appContext.season} • {appContext.weather}
-          </Text>
-        )}
-      </View>
-
-      <TouchableOpacity
-        style={[
-          styles.generateButton,
-          generating && styles.disabledButton,
-        ]}
-        onPress={generateRandomOutfit}
-        disabled={generating}
+      <View
+        style={
+          styles.aiCard
+        }
       >
-        {generating ? (
-          <ActivityIndicator color="#111" />
-        ) : (
-          <Text style={styles.generateButtonText}>
-            🎲 Surprise Me
+        {appContext && (
+          <Text
+            style={
+              styles.weatherText
+            }
+          >
+            {t(
+              'season.summer'
+            )}
+            {' • '}
+            {formatTemperature(
+              appContext.temperature,
+              temperatureUnit
+            )}
+            {' • '}
+            {translateWeather(
+              getWeatherType(
+                appContext
+              )
+            )}
           </Text>
         )}
-      </TouchableOpacity>
 
-      {engineResult &&
-      (!selectedOutfit || !displayOutfit) ? (
-        <View style={styles.noResultCard}>
-          <Text style={styles.noResultTitle}>
-            No strong {stylePreference} outfit found
+        <Text
+          style={
+            styles.aiEmoji
+          }
+        >
+          🧠
+        </Text>
+
+        <Text
+          style={
+            styles.aiTitle
+          }
+        >
+          {replaceValue(
+            t(
+              'smartSuggestion.recommendation'
+            ),
+            'style',
+            translateStyle(
+              stylePreference
+            )
+          )}
+        </Text>
+
+        <Text
+          style={
+            styles.aiText
+          }
+        >
+          {engineResult?.message ||
+            t(
+              'smartSuggestion.analyzed'
+            )}
+        </Text>
+
+        <Text
+          style={
+            styles.modeText
+          }
+        >
+          {t(
+            'smartSuggestion.summerMode'
+          )}
+        </Text>
+      </View>
+
+      {!selectedOutfit ||
+      !displayOutfit ? (
+        <View
+          style={
+            styles.noResultCard
+          }
+        >
+          <Text
+            style={
+              styles.noResultTitle
+            }
+          >
+            {replaceValue(
+              t(
+                'smartSuggestion.noStrong'
+              ),
+              'style',
+              translateStyle(
+                stylePreference
+              )
+            )}
           </Text>
 
-          <Text style={styles.noResultText}>
-            {engineResult.message}
+          <Text
+            style={
+              styles.noResultText
+            }
+          >
+            {engineResult?.message ||
+              replaceValue(
+                t(
+                  'smartSuggestion.addMore'
+                ),
+                'style',
+                translateStyle(
+                  stylePreference
+                )
+              )}
           </Text>
 
-          <Text style={styles.noResultHint}>
-            Triple N will not show a weak or unsuitable
-            combination.
+          <Text
+            style={
+              styles.noResultHint
+            }
+          >
+            {t(
+              'smartSuggestion.noWeak'
+            )}
           </Text>
+
+          <TouchableOpacity
+            style={
+              styles.refreshButton
+            }
+            onPress={
+              refreshSuggestion
+            }
+          >
+            <Text
+              style={
+                styles.refreshButtonText
+              }
+            >
+              {t(
+                'smartSuggestion.analyzeAgain'
+              )}
+            </Text>
+          </TouchableOpacity>
         </View>
-      ) : selectedOutfit && displayOutfit ? (
+      ) : (
         <>
-          <View style={styles.resultInfo}>
-            <Text style={styles.resultCount}>
-              Random choice from{' '}
-              {engineResult?.suitableCount || 1} suitable
-              outfit(s)
+          <View
+            style={
+              styles.resultInfo
+            }
+          >
+            <Text
+              style={
+                styles.resultCount
+              }
+            >
+              {engineResult
+                ?.suitableCount ===
+              1
+                ? replaceValue(
+                    t(
+                      'smartSuggestion.oneSuitable'
+                    ),
+                    'style',
+                    translateStyle(
+                      stylePreference
+                    )
+                  )
+                : replaceTwoValues(
+                    t(
+                      'smartSuggestion.outfitCount'
+                    ),
+                    'current',
+                    currentIndex +
+                      1,
+                    'total',
+                    suitableOutfits.length
+                  )}
             </Text>
 
-            <Text style={styles.resultMessage}>
-              {engineResult?.message}
+            <Text
+              style={
+                styles.resultMessage
+              }
+            >
+              {
+                engineResult?.message
+              }
             </Text>
           </View>
 
-          <View style={styles.scoreRow}>
-            <View style={styles.scoreChip}>
-              <Text style={styles.scoreValue}>
-                {selectedOutfit.score}%
+          <View
+            style={
+              styles.scoreRow
+            }
+          >
+            <View
+              style={
+                styles.scoreChip
+              }
+            >
+              <Text
+                style={
+                  styles.scoreValue
+                }
+              >
+                {
+                  selectedOutfit.score
+                }
+                %
               </Text>
 
-              <Text style={styles.scoreLabel}>
-                Match
+              <Text
+                style={
+                  styles.scoreLabel
+                }
+              >
+                {t(
+                  'outfit.match'
+                )}
               </Text>
             </View>
 
-            <View style={styles.scoreChip}>
-              <Text style={styles.scoreValue}>
-                {breakdown?.color || 0}%
+            <View
+              style={
+                styles.scoreChip
+              }
+            >
+              <Text
+                style={
+                  styles.scoreValue
+                }
+              >
+                {breakdown
+                  ?.color ||
+                  0}
+                %
               </Text>
 
-              <Text style={styles.scoreLabel}>
-                Colors
+              <Text
+                style={
+                  styles.scoreLabel
+                }
+              >
+                {t(
+                  'outfit.colors'
+                )}
               </Text>
             </View>
 
-            <View style={styles.scoreChip}>
-              <Text style={styles.scoreValue}>
-                {breakdown?.style || 0}%
+            <View
+              style={
+                styles.scoreChip
+              }
+            >
+              <Text
+                style={
+                  styles.scoreValue
+                }
+              >
+                {breakdown
+                  ?.style ||
+                  0}
+                %
               </Text>
 
-              <Text style={styles.scoreLabel}>
-                Style
+              <Text
+                style={
+                  styles.scoreLabel
+                }
+              >
+                {t(
+                  'outfit.style'
+                )}
               </Text>
             </View>
           </View>
 
-          <View style={styles.outfitCanvasCard}>
+          <View
+            style={
+              styles.secondaryScoreRow
+            }
+          >
+            <Text
+              style={
+                styles.secondaryScoreText
+              }
+            >
+              ☀️{' '}
+              {t(
+                'outfit.weather'
+              )}
+              :{' '}
+              {breakdown
+                ?.weather ||
+                0}
+              %
+            </Text>
+          </View>
+
+          {accessoryPromptStep !==
+            'hidden' && (
+            <View
+              style={
+                styles.accessoryPrompt
+              }
+            >
+              {accessoryPromptStep ===
+              'chooseAccessory' ? (
+                <>
+                  <Text
+                    style={
+                      styles.accessoryPromptTitle
+                    }
+                  >
+                    {language ===
+                    'Italian'
+                      ? 'Vuoi aggiungere una borsa o un cappellino?'
+                      : 'Would you like to add a bag or a cap?'}
+                  </Text>
+
+                  <View
+                    style={
+                      styles.accessoryPromptButtons
+                    }
+                  >
+                    <TouchableOpacity
+                      style={
+                        styles.accessoryPromptButton
+                      }
+                      onPress={() =>
+                        setAccessoryPromptStep(
+                          'chooseBagType'
+                        )
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.accessoryPromptButtonText
+                        }
+                      >
+                        {language ===
+                        'Italian'
+                          ? 'Borsa'
+                          : 'Bag'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={
+                        styles.accessoryPromptButton
+                      }
+                      onPress={() =>
+                        addAccessoryToOutfit(
+                          'Cap'
+                        )
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.accessoryPromptButtonText
+                        }
+                      >
+                        {language ===
+                        'Italian'
+                          ? 'Cappellino'
+                          : 'Cap'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={
+                        styles.accessorySkipButton
+                      }
+                      onPress={() =>
+                        setAccessoryPromptStep(
+                          'hidden'
+                        )
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.accessorySkipText
+                        }
+                      >
+                        {language ===
+                        'Italian'
+                          ? 'Niente'
+                          : 'Neither'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : accessoryPromptStep ===
+                'chooseBagType' ? (
+                <>
+                  <Text
+                    style={
+                      styles.accessoryPromptTitle
+                    }
+                  >
+                    {language ===
+                    'Italian'
+                      ? 'Scegli il tipo di borsa'
+                      : 'Choose a bag type'}
+                  </Text>
+
+                  <View
+                    style={
+                      styles.accessoryPromptButtons
+                    }
+                  >
+                    <TouchableOpacity
+                      style={
+                        styles.accessoryPromptButton
+                      }
+                      onPress={() =>
+                        addAccessoryToOutfit(
+                          'Backpack'
+                        )
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.accessoryPromptButtonText
+                        }
+                      >
+                        {language ===
+                        'Italian'
+                          ? 'Zaino'
+                          : 'Backpack'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={
+                        styles.accessoryPromptButton
+                      }
+                      onPress={() =>
+                        addAccessoryToOutfit(
+                          'Handbag'
+                        )
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.accessoryPromptButtonText
+                        }
+                      >
+                        {language ===
+                        'Italian'
+                          ? 'Borsa'
+                          : 'Handbag'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={
+                        styles.accessorySkipButton
+                      }
+                      onPress={() =>
+                        setAccessoryPromptStep(
+                          'chooseAccessory'
+                        )
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.accessorySkipText
+                        }
+                      >
+                        {language ===
+                        'Italian'
+                          ? 'Indietro'
+                          : 'Back'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : accessoryPromptStep ===
+                'askForBag' ? (
+                <>
+                  <Text
+                    style={
+                      styles.accessoryPromptTitle
+                    }
+                  >
+                    {language ===
+                    'Italian'
+                      ? 'Vuoi aggiungere anche una borsa?'
+                      : 'Would you also like to add a bag?'}
+                  </Text>
+
+                  <View
+                    style={
+                      styles.accessoryPromptButtons
+                    }
+                  >
+                    <TouchableOpacity
+                      style={
+                        styles.accessoryPromptButton
+                      }
+                      onPress={() =>
+                        setAccessoryPromptStep(
+                          'chooseBagType'
+                        )
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.accessoryPromptButtonText
+                        }
+                      >
+                        {language ===
+                        'Italian'
+                          ? 'Sì, borsa'
+                          : 'Yes, add bag'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={
+                        styles.accessorySkipButton
+                      }
+                      onPress={() =>
+                        setAccessoryPromptStep(
+                          'hidden'
+                        )
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.accessorySkipText
+                        }
+                      >
+                        No
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text
+                    style={
+                      styles.accessoryPromptTitle
+                    }
+                  >
+                    {language ===
+                    'Italian'
+                      ? 'Vuoi aggiungere anche un cappellino?'
+                      : 'Would you also like to add a cap?'}
+                  </Text>
+
+                  <View
+                    style={
+                      styles.accessoryPromptButtons
+                    }
+                  >
+                    <TouchableOpacity
+                      style={
+                        styles.accessoryPromptButton
+                      }
+                      onPress={() =>
+                        addAccessoryToOutfit(
+                          'Cap'
+                        )
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.accessoryPromptButtonText
+                        }
+                      >
+                        {language ===
+                        'Italian'
+                          ? 'Sì, cappellino'
+                          : 'Yes, add cap'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={
+                        styles.accessorySkipButton
+                      }
+                      onPress={() =>
+                        setAccessoryPromptStep(
+                          'hidden'
+                        )
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.accessorySkipText
+                        }
+                      >
+                        No
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </View>
+          )}
+
+          <View
+            style={
+              styles.outfitCanvasCard
+            }
+          >
             <OutfitCanvas
               outfit={{
-                top: displayOutfit.top,
+                top:
+                  displayOutfit.top,
+
                 bottom:
                   displayOutfit.bottom ||
                   displayOutfit.pants ||
                   null,
-                shoes: displayOutfit.shoes,
-                jacket: displayOutfit.jacket,
+
+                shoes:
+                  displayOutfit.shoes,
+
+                /**
+                 * Summer V1:
+                 * الجاكيت محذوف من العرض.
+                 */
+                jacket:
+                  null,
+
+                bag:
+                  displayOutfit.bag,
+
+                cap:
+                  displayOutfit.cap,
+
+                watch:
+                  displayOutfit.watch,
+
                 accessory:
                   displayOutfit.accessory,
               }}
@@ -473,374 +1732,558 @@ export default function RandomOutfitScreen() {
             />
           </View>
 
-          {selectedOutfit.reasons.length > 0 && (
-            <View style={styles.reasonsCard}>
-              <Text style={styles.reasonsTitle}>
-                Why this works
+          {selectedOutfit
+            .reasons
+            .length >
+            0 && (
+            <View
+              style={
+                styles.reasonsCard
+              }
+            >
+              <Text
+                style={
+                  styles.reasonsTitle
+                }
+              >
+                {t(
+                  'outfit.whyWorks'
+                )}
               </Text>
 
-              {selectedOutfit.reasons
-                .slice(0, 4)
-                .map((reason, index) => (
-                  <Text
-                    key={`${reason}-${index}`}
-                    style={styles.reasonText}
-                  >
-                    • {reason}
-                  </Text>
-                ))}
+              {selectedOutfit
+                .reasons
+                .slice(
+                  0,
+                  5
+                )
+                .map(
+                  (
+                    reason,
+                    index
+                  ) => (
+                    <Text
+                      key={`${reason}-${index}`}
+                      style={
+                        styles.reasonText
+                      }
+                    >
+                      •{' '}
+                      {reason}
+                    </Text>
+                  )
+                )}
             </View>
           )}
 
-          <View style={styles.actionRow}>
+          <View
+            style={
+              styles.actionRow
+            }
+          >
             <TouchableOpacity
-              style={styles.anotherButton}
-              onPress={generateRandomOutfit}
+              style={[
+                styles.actionButton,
+
+                suitableOutfits.length <=
+                  1 &&
+                  styles.disabledButton,
+              ]}
+              onPress={
+                generateAgain
+              }
+              disabled={
+                suitableOutfits.length <=
+                1
+              }
             >
-              <Text style={styles.anotherButtonText}>
-                🎲 Another One
+              <Text
+                style={
+                  styles.actionButtonText
+                }
+              >
+                🔄{' '}
+                {t(
+                  'outfit.next'
+                )}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[
-                styles.saveButton,
-                saving && styles.disabledButton,
+                styles.actionButtonLight,
+
+                saving &&
+                  styles.disabledButton,
               ]}
-              onPress={saveOutfit}
-              disabled={saving}
+              onPress={
+                saveSmartOutfit
+              }
+              disabled={
+                saving
+              }
             >
               {saving ? (
-                <ActivityIndicator color="#111" />
+                <ActivityIndicator
+                  color="#111"
+                />
               ) : (
-                <Text style={styles.saveButtonText}>
-                  💾 Save
+                <Text
+                  style={
+                    styles.actionButtonLightText
+                  }
+                >
+                  💾{' '}
+                  {t(
+                    'common.save'
+                  )}
                 </Text>
               )}
             </TouchableOpacity>
           </View>
         </>
-      ) : (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyEmoji}>👕</Text>
-
-          <Text style={styles.emptyTitle}>
-            Ready for a surprise?
-          </Text>
-
-          <Text style={styles.emptyText}>
-            Press Surprise Me to generate a smart outfit.
-          </Text>
-        </View>
       )}
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#07090d',
-  },
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor:
+        '#07090d',
+    },
 
-  loadingScreen: {
-    flex: 1,
-    backgroundColor: '#07090d',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 30,
-  },
+    loadingScreen: {
+      flex: 1,
+      backgroundColor:
+        '#07090d',
+      alignItems:
+        'center',
+      justifyContent:
+        'center',
+      paddingHorizontal:
+        30,
+    },
 
-  loadingText: {
-    color: '#aaa',
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginTop: 15,
-  },
+    loadingText: {
+      color: '#aaa',
+      fontSize: 14,
+      fontWeight:
+        '700',
+      textAlign:
+        'center',
+      marginTop: 16,
+    },
 
-  content: {
-    padding: 22,
-    paddingTop: 58,
-    paddingBottom: 35,
-  },
+    content: {
+      padding: 22,
+      paddingTop: 58,
+      paddingBottom: 35,
+    },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 18,
-  },
+    header: {
+      flexDirection:
+        'row',
+      alignItems:
+        'center',
+      marginBottom: 14,
+    },
 
-  headerText: {
-    flex: 1,
-  },
+    headerText: {
+      flex: 1,
+    },
 
-  backButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#17191d',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
+    backIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor:
+        '#17191d',
+      justifyContent:
+        'center',
+      alignItems:
+        'center',
+      marginRight: 12,
+    },
 
-  backText: {
-    color: 'white',
-    fontSize: 32,
-    fontWeight: '300',
-    marginTop: -3,
-  },
+    backIconText: {
+      color: 'white',
+      fontSize: 28,
+      fontWeight:
+        '300',
+    },
 
-  title: {
-    color: 'white',
-    fontSize: 32,
-    fontWeight: '900',
-  },
+    title: {
+      color: 'white',
+      fontSize: 30,
+      fontWeight:
+        '900',
+    },
 
-  subtitle: {
-    color: '#aaa',
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 3,
-  },
+    subtitle: {
+      color: '#888',
+      fontSize: 13,
+      marginTop: 3,
+      fontWeight:
+        '600',
+    },
 
-  infoCard: {
-    backgroundColor: '#17191d',
-    borderRadius: 24,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#252a31',
-    marginBottom: 14,
-    alignItems: 'center',
-  },
+    aiCard: {
+      backgroundColor:
+        '#17191d',
+      borderRadius: 22,
+      padding: 14,
+      alignItems:
+        'center',
+      marginBottom: 14,
+      borderWidth: 1,
+      borderColor:
+        '#272a33',
+    },
 
-  infoEmoji: {
-    fontSize: 36,
-  },
+    weatherText: {
+      color: '#facc15',
+      textAlign:
+        'center',
+      fontSize: 13,
+      marginBottom: 12,
+      fontWeight:
+        '900',
+    },
 
-  infoTitle: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: '900',
-    marginTop: 8,
-  },
+    aiEmoji: {
+      fontSize: 30,
+    },
 
-  infoText: {
-    color: '#aaa',
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 20,
-    textAlign: 'center',
-    marginTop: 6,
-  },
+    aiTitle: {
+      color: 'white',
+      fontSize: 18,
+      fontWeight:
+        '900',
+      marginTop: 6,
+    },
 
-  contextText: {
-    color: '#facc15',
-    fontSize: 12,
-    fontWeight: '900',
-    marginTop: 10,
-  },
+    aiText: {
+      color: '#aaa',
+      textAlign:
+        'center',
+      marginTop: 6,
+      fontSize: 12,
+      lineHeight: 18,
+      fontWeight:
+        '700',
+    },
 
-  generateButton: {
-    backgroundColor: '#f1d8c2',
-    height: 54,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
+    modeText: {
+      color: '#facc15',
+      fontSize: 11,
+      fontWeight:
+        '800',
+      marginTop: 8,
+    },
 
-  generateButtonText: {
-    color: '#111',
-    fontSize: 16,
-    fontWeight: '900',
-  },
+    resultInfo: {
+      alignItems:
+        'center',
+      marginBottom: 10,
+    },
 
-  resultInfo: {
-    alignItems: 'center',
-    marginBottom: 10,
-  },
+    resultCount: {
+      color: '#f1d8c2',
+      fontSize: 13,
+      fontWeight:
+        '900',
+      textAlign:
+        'center',
+    },
 
-  resultCount: {
-    color: '#f1d8c2',
-    fontSize: 13,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
+    resultMessage: {
+      color: '#888',
+      fontSize: 11,
+      fontWeight:
+        '700',
+      textAlign:
+        'center',
+      marginTop: 4,
+    },
 
-  resultMessage: {
-    color: '#888',
-    fontSize: 11,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginTop: 4,
-  },
+    scoreRow: {
+      flexDirection:
+        'row',
+      gap: 8,
+      marginBottom: 8,
+    },
 
-  scoreRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
+    scoreChip: {
+      flex: 1,
+      backgroundColor:
+        '#17191d',
+      borderRadius: 18,
+      paddingVertical: 10,
+      alignItems:
+        'center',
+      borderWidth: 1,
+      borderColor:
+        '#272a33',
+    },
 
-  scoreChip: {
-    flex: 1,
-    backgroundColor: '#17191d',
-    borderRadius: 18,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#272a33',
-  },
+    scoreValue: {
+      color: '#f59e0b',
+      fontSize: 18,
+      fontWeight:
+        '900',
+    },
 
-  scoreValue: {
-    color: '#f59e0b',
-    fontSize: 18,
-    fontWeight: '900',
-  },
+    scoreLabel: {
+      color: '#888',
+      fontSize: 10,
+      fontWeight:
+        '800',
+      marginTop: 2,
+    },
 
-  scoreLabel: {
-    color: '#888',
-    fontSize: 10,
-    fontWeight: '800',
-    marginTop: 2,
-  },
+    secondaryScoreRow: {
+      flexDirection:
+        'row',
+      justifyContent:
+        'center',
+      gap: 8,
+      marginBottom: 12,
+    },
 
-  outfitCanvasCard: {
-    backgroundColor: '#f4efe6',
-    borderRadius: 26,
-    paddingVertical: 18,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: '#252a31',
-    marginBottom: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    secondaryScoreText: {
+      color: '#aaa',
+      backgroundColor:
+        '#17191d',
+      borderWidth: 1,
+      borderColor:
+        '#272a33',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 14,
+      fontSize: 10,
+      fontWeight:
+        '800',
+    },
 
-  reasonsCard: {
-    backgroundColor: '#17191d',
-    borderRadius: 20,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#272a33',
-  },
+    accessoryPrompt: {
+      width: '100%',
+      backgroundColor:
+        '#17191d',
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor:
+        '#252a31',
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      marginBottom: 12,
+    },
 
-  reasonsTitle: {
-    color: 'white',
-    fontSize: 15,
-    fontWeight: '900',
-    marginBottom: 8,
-  },
+    accessoryPromptTitle: {
+      color: 'white',
+      fontSize: 13,
+      fontWeight:
+        '900',
+      textAlign:
+        'center',
+      marginBottom: 10,
+    },
 
-  reasonText: {
-    color: '#aaa',
-    fontSize: 12,
-    fontWeight: '700',
-    lineHeight: 19,
-    marginBottom: 4,
-  },
+    accessoryPromptButtons: {
+      flexDirection:
+        'row',
+      justifyContent:
+        'center',
+      gap: 8,
+    },
 
-  noResultCard: {
-    backgroundColor: '#17191d',
-    borderRadius: 24,
-    padding: 22,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#272a33',
-  },
+    accessoryPromptButton: {
+      flex: 1,
+      minHeight: 38,
+      backgroundColor:
+        '#f1d8c2',
+      borderRadius: 13,
+      alignItems:
+        'center',
+      justifyContent:
+        'center',
+      paddingHorizontal: 8,
+    },
 
-  noResultTitle: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
+    accessoryPromptButtonText: {
+      color: '#111',
+      fontSize: 11,
+      fontWeight:
+        '900',
+      textAlign:
+        'center',
+    },
 
-  noResultText: {
-    color: '#999',
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 20,
-    textAlign: 'center',
-    marginTop: 8,
-  },
+    accessorySkipButton: {
+      minWidth: 64,
+      minHeight: 38,
+      backgroundColor:
+        '#25282e',
+      borderRadius: 13,
+      alignItems:
+        'center',
+      justifyContent:
+        'center',
+      paddingHorizontal: 10,
+    },
 
-  noResultHint: {
-    color: '#f1d8c2',
-    fontSize: 11,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginTop: 12,
-  },
+    accessorySkipText: {
+      color: '#ddd',
+      fontSize: 11,
+      fontWeight:
+        '800',
+    },
 
-  emptyCard: {
-    backgroundColor: '#17191d',
-    borderRadius: 24,
-    padding: 28,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#272a33',
-  },
+    outfitCanvasCard: {
+      backgroundColor:
+        '#f4efe6',
+      borderRadius: 26,
+      paddingVertical: 18,
+      paddingHorizontal: 10,
+      borderWidth: 1,
+      borderColor:
+        '#252a31',
+      marginBottom: 12,
+      alignItems:
+        'center',
+      justifyContent:
+        'center',
+    },
 
-  emptyEmoji: {
-    fontSize: 38,
-  },
+    reasonsCard: {
+      backgroundColor:
+        '#17191d',
+      borderRadius: 20,
+      padding: 14,
+      borderWidth: 1,
+      borderColor:
+        '#272a33',
+    },
 
-  emptyTitle: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '900',
-    marginTop: 10,
-  },
+    reasonsTitle: {
+      color: 'white',
+      fontSize: 15,
+      fontWeight:
+        '900',
+      marginBottom: 8,
+    },
 
-  emptyText: {
-    color: '#999',
-    fontSize: 13,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginTop: 7,
-  },
+    reasonText: {
+      color: '#aaa',
+      fontSize: 12,
+      fontWeight:
+        '700',
+      lineHeight: 19,
+      marginBottom: 4,
+    },
 
-  actionRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 14,
-  },
+    noResultCard: {
+      backgroundColor:
+        '#17191d',
+      borderRadius: 24,
+      padding: 22,
+      alignItems:
+        'center',
+      borderWidth: 1,
+      borderColor:
+        '#272a33',
+    },
 
-  anotherButton: {
-    flex: 1,
-    height: 50,
-    borderRadius: 22,
-    backgroundColor: '#17191d',
-    borderWidth: 1,
-    borderColor: '#f1d8c2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    noResultTitle: {
+      color: 'white',
+      fontSize: 18,
+      fontWeight:
+        '900',
+      textAlign:
+        'center',
+    },
 
-  anotherButtonText: {
-    color: '#f1d8c2',
-    fontSize: 14,
-    fontWeight: '900',
-  },
+    noResultText: {
+      color: '#999',
+      fontSize: 13,
+      fontWeight:
+        '700',
+      lineHeight: 20,
+      textAlign:
+        'center',
+      marginTop: 8,
+    },
 
-  saveButton: {
-    flex: 1,
-    height: 50,
-    borderRadius: 22,
-    backgroundColor: '#f1d8c2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    noResultHint: {
+      color: '#f1d8c2',
+      fontSize: 11,
+      fontWeight:
+        '800',
+      textAlign:
+        'center',
+      marginTop: 10,
+    },
 
-  saveButtonText: {
-    color: '#111',
-    fontSize: 15,
-    fontWeight: '900',
-  },
+    refreshButton: {
+      backgroundColor:
+        '#f1d8c2',
+      borderRadius: 18,
+      paddingVertical: 12,
+      paddingHorizontal: 28,
+      marginTop: 18,
+    },
 
-  disabledButton: {
-    opacity: 0.45,
-  },
-});
+    refreshButtonText: {
+      color: '#111',
+      fontSize: 14,
+      fontWeight:
+        '900',
+    },
+
+    actionRow: {
+      flexDirection:
+        'row',
+      gap: 10,
+      marginTop: 14,
+    },
+
+    actionButton: {
+      flex: 1,
+      backgroundColor:
+        '#f1d8c2',
+      paddingVertical: 14,
+      borderRadius: 20,
+      alignItems:
+        'center',
+    },
+
+    actionButtonText: {
+      color: '#111',
+      fontSize: 14,
+      fontWeight:
+        '900',
+    },
+
+    actionButtonLight: {
+      flex: 1,
+      backgroundColor:
+        '#ffffff',
+      paddingVertical: 14,
+      borderRadius: 20,
+      alignItems:
+        'center',
+    },
+
+    actionButtonLightText: {
+      color: '#111',
+      fontSize: 15,
+      fontWeight:
+        '900',
+    },
+
+    disabledButton: {
+      opacity: 0.45,
+    },
+  });

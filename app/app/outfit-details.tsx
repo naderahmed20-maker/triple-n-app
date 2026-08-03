@@ -1,135 +1,282 @@
+import { useTranslation } from '@/lib/i18n';
+
 import {
-  SavedOutfit,
+  type SavedOutfit,
   deleteOutfit as deleteOutfitFromService,
   getSavedOutfitById,
   updateOutfitFavorite,
 } from '@/lib/outfitService';
+
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+
+import {
+  router,
+  useLocalSearchParams,
+} from 'expo-router';
+
+import * as Sharing from 'expo-sharing';
+
+import {
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+
 import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 
+import {
+  captureRef,
+} from 'react-native-view-shot';
+
 import OutfitCanvas from './components/OutfitCanvas';
 
-type DetailedSavedOutfit = SavedOutfit & {
-  aiScore?: number;
-  weatherScore?: number;
-  seasonScore?: number;
-  styleScore?: number;
-  explanation?: string[];
-};
+type DetailedSavedOutfit =
+  SavedOutfit & {
+    aiScore?: number;
+    weatherScore?: number;
+    styleScore?: number;
+    explanation?: string[];
+  };
 
 export default function OutfitDetailsScreen() {
-  const { id } = useLocalSearchParams();
+  const {
+    t,
+    language,
+  } = useTranslation();
 
-  const [outfit, setOutfit] =
-    useState<DetailedSavedOutfit | null>(null);
+  const { id } =
+    useLocalSearchParams<{
+      id?:
+        | string
+        | string[];
+    }>();
 
-  const [rowFavorite, setRowFavorite] = useState(false);
-  const [createdAt, setCreatedAt] =
-    useState<string | null>(null);
+  const outfitId =
+    Array.isArray(id)
+      ? id[0]
+      : id;
 
-  const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState(false);
-
-  useEffect(() => {
-    loadOutfit();
-  }, [id]);
-
-  async function loadOutfit() {
-    if (!id) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const row = await getSavedOutfitById(String(id));
-
-      setOutfit(row.outfit as DetailedSavedOutfit);
-      setRowFavorite(Boolean(row.favorite));
-      setCreatedAt(row.created_at);
-    } catch (error: any) {
-      Alert.alert(
-        'Error',
-        error?.message || 'Outfit not found.'
-      );
-
-      router.back();
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function openPreview() {
-    if (!outfit) return;
-
-    await AsyncStorage.removeItem('previewImage');
-
-    await AsyncStorage.setItem(
-      'previewOutfit',
-      JSON.stringify({
-        top: outfit.top,
-        pants:
-          outfit.pants ||
-          outfit.bottom ||
-          null,
-        bottom:
-          outfit.pants ||
-          outfit.bottom ||
-          null,
-        shoes: outfit.shoes,
-        jacket: outfit.jacket,
-        accessory: outfit.accessory || null,
-      })
+  const previewRef =
+    useRef<View | null>(
+      null
     );
 
-    router.push('/app/outfit-preview' as any);
+  const [
+    outfit,
+    setOutfit,
+  ] =
+    useState<DetailedSavedOutfit | null>(
+      null
+    );
+
+  const [
+    rowFavorite,
+    setRowFavorite,
+  ] =
+    useState(false);
+
+  const [
+    createdAt,
+    setCreatedAt,
+  ] =
+    useState<string | null>(
+      null
+    );
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(true);
+
+  const [
+    deleting,
+    setDeleting,
+  ] =
+    useState(false);
+
+  const [
+    sharing,
+    setSharing,
+  ] =
+    useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadOutfit() {
+      if (!outfitId) {
+        setLoading(false);
+
+        return;
+      }
+
+      try {
+        const row =
+          await getSavedOutfitById(
+            outfitId
+          );
+
+        if (!active) {
+          return;
+        }
+
+        setOutfit(
+          row.outfit as
+            DetailedSavedOutfit
+        );
+
+        setRowFavorite(
+          Boolean(
+            row.favorite
+          )
+        );
+
+        setCreatedAt(
+          row.created_at
+        );
+      } catch (
+        error: any
+      ) {
+        if (!active) {
+          return;
+        }
+
+        Alert.alert(
+          t('common.error'),
+          error?.message ||
+            t(
+              'details.loadFailed'
+            )
+        );
+
+        router.back();
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadOutfit();
+
+    return () => {
+      active = false;
+    };
+  }, [
+    outfitId,
+    t,
+  ]);
+
+  function formatSavedDate(
+    value?:
+      | string
+      | number
+      | null
+  ) {
+    if (!value) {
+      return '';
+    }
+
+    const date =
+      new Date(value);
+
+    if (
+      Number.isNaN(
+        date.getTime()
+      )
+    ) {
+      return '';
+    }
+
+    return date.toLocaleDateString(
+      language === 'Italian'
+        ? 'it-IT'
+        : 'en-US'
+    );
+  }
+
+  function showTryOnComingSoon() {
+    Alert.alert(
+      t(
+        'details.tryOnTitle'
+      ),
+      t(
+        'details.tryOnMessage'
+      ),
+      [
+        {
+          text: t(
+            'details.gotIt'
+          ),
+        },
+      ]
+    );
   }
 
   async function toggleFavorite() {
-    if (!id) return;
+    if (!outfitId) {
+      return;
+    }
 
-    const newFavorite = !rowFavorite;
+    const newFavorite =
+      !rowFavorite;
 
     try {
       await updateOutfitFavorite(
-        String(id),
+        outfitId,
         newFavorite
       );
 
-      setRowFavorite(newFavorite);
-    } catch (error: any) {
+      setRowFavorite(
+        newFavorite
+      );
+    } catch (
+      error: any
+    ) {
       Alert.alert(
-        'Error',
+        t('common.error'),
         error?.message ||
-          'Could not update favorite.'
+          t(
+            'details.favoriteFailed'
+          )
       );
     }
   }
 
   async function performDelete() {
-    if (!id || deleting) return;
+    if (
+      !outfitId ||
+      deleting
+    ) {
+      return;
+    }
 
     setDeleting(true);
 
     try {
-      await deleteOutfitFromService(String(id));
+      await deleteOutfitFromService(
+        outfitId
+      );
+
       router.back();
-    } catch (error: any) {
+    } catch (
+      error: any
+    ) {
       Alert.alert(
-        'Error',
+        t('common.error'),
         error?.message ||
-          'Could not delete outfit.'
+          t(
+            'details.deleteFailed'
+          )
       );
 
       setDeleting(false);
@@ -138,69 +285,133 @@ export default function OutfitDetailsScreen() {
 
   function deleteOutfit() {
     Alert.alert(
-      'Delete Outfit',
-      'Are you sure you want to delete this outfit?',
+      t(
+        'details.deleteTitle'
+      ),
+      t(
+        'details.deleteQuestion'
+      ),
       [
         {
-          text: 'Cancel',
+          text: t(
+            'common.cancel'
+          ),
           style: 'cancel',
         },
         {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: performDelete,
+          text: t(
+            'common.delete'
+          ),
+          style:
+            'destructive',
+          onPress:
+            performDelete,
         },
       ]
     );
   }
 
   async function shareOutfit() {
-    if (!outfit) return;
+    if (
+      !outfit ||
+      sharing
+    ) {
+      return;
+    }
 
-    const bottom =
-      outfit.pants ||
-      outfit.bottom ||
-      null;
+    setSharing(true);
 
-    const explanation =
-      outfit.explanation &&
-      outfit.explanation.length > 0
-        ? `\n\nWhy it works:\n${outfit.explanation
-            .slice(0, 3)
-            .map((reason) => `• ${reason}`)
-            .join('\n')}`
-        : '';
+    try {
+      if (
+        !previewRef.current
+      ) {
+        throw new Error(
+          t(
+            'details.previewNotReady'
+          )
+        );
+      }
 
-    await Share.share({
-      message: `👕 ${outfit.top?.name || 'Top'}
-👖 ${bottom?.name || 'Bottom'}
-👟 ${outfit.shoes?.name || 'Shoes'}
-🧥 ${outfit.jacket?.name || 'No Jacket'}
-👜 ${outfit.accessory?.name || 'No Accessory'}
-🎯 ${outfit.occasion || 'Occasion not saved'}
-🌦 ${outfit.weather || 'Weather not saved'}
-🍂 ${outfit.season || 'Season not saved'}
+      const sharingAvailable =
+        await Sharing
+          .isAvailableAsync();
 
-Match: ${outfit.score || outfit.aiScore || 0}%
-Colors: ${outfit.colorScore || 0}%
-Style: ${outfit.styleScore || 0}%
-Weather: ${outfit.weatherScore || 0}%
-Season: ${outfit.seasonScore || 0}%${explanation}
+      if (
+        !sharingAvailable
+      ) {
+        Alert.alert(
+          t(
+            'details.shareUnavailable'
+          ),
+          t(
+            'details.shareUnavailableMessage'
+          )
+        );
 
-Made with Triple N ✨`,
-    });
+        return;
+      }
+
+      const imageUri =
+        await captureRef(
+          previewRef.current,
+          {
+            format: 'png',
+            quality: 1,
+            result:
+              'tmpfile',
+          }
+        );
+
+      await Sharing.shareAsync(
+        imageUri,
+        {
+          mimeType:
+            'image/png',
+          dialogTitle:
+            'Triple N',
+        }
+      );
+    } catch (
+      error
+    ) {
+      console.error(
+        'OUTFIT SHARE ERROR:',
+        error
+      );
+
+      Alert.alert(
+        t(
+          'details.couldNotShare'
+        ),
+        t(
+          'details.tryAgainMoment'
+        )
+      );
+    } finally {
+      setSharing(false);
+    }
   }
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View
+        style={
+          styles.loadingContainer
+        }
+      >
         <ActivityIndicator
           size="large"
           color="#f1d8c2"
         />
 
-        <Text style={styles.loadingText}>
-          Loading outfit...
+        <Text
+          style={
+            styles.loadingText
+          }
+        >
+          {t(
+            'details.loading'
+          )}
         </Text>
       </View>
     );
@@ -208,9 +419,19 @@ Made with Triple N ✨`,
 
   if (!outfit) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.title}>
-          Outfit not found
+      <View
+        style={
+          styles.emptyContainer
+        }
+      >
+        <Text
+          style={
+            styles.title
+          }
+        >
+          {t(
+            'details.notFound'
+          )}
         </Text>
       </View>
     );
@@ -238,23 +459,41 @@ Made with Triple N ✨`,
     outfit.weatherScore ||
     0;
 
-  const seasonScore =
-    outfit.seasonScore ||
-    0;
-
   const explanation =
-    outfit.explanation || [];
+    outfit.explanation ||
+    [];
+
+  const savedDate =
+    formatSavedDate(
+      createdAt ||
+        outfit.createdAt ||
+        null
+    );
 
   return (
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
+      style={
+        styles.container
+      }
+      contentContainerStyle={
+        styles.content
+      }
+      showsVerticalScrollIndicator={
+        false
+      }
     >
-      <View style={styles.header}>
+      <View
+        style={
+          styles.header
+        }
+      >
         <TouchableOpacity
-          style={styles.backIcon}
-          onPress={() => router.back()}
+          style={
+            styles.backIcon
+          }
+          onPress={() =>
+            router.back()
+          }
         >
           <Ionicons
             name="chevron-back"
@@ -263,105 +502,209 @@ Made with Triple N ✨`,
           />
         </TouchableOpacity>
 
-        <View style={styles.headerText}>
-          <Text style={styles.title}>
-            Saved Outfit
+        <View
+          style={
+            styles.headerText
+          }
+        >
+          <Text
+            style={
+              styles.title
+            }
+          >
+            {t(
+              'details.title'
+            )}
           </Text>
 
-          <Text style={styles.date}>
-            {createdAt
-              ? new Date(
-                  createdAt
-                ).toLocaleDateString()
-              : outfit.createdAt
-                ? new Date(
-                    outfit.createdAt
-                  ).toLocaleDateString()
-                : ''}
-          </Text>
+          {savedDate ? (
+            <Text
+              style={
+                styles.date
+              }
+            >
+              {savedDate}
+            </Text>
+          ) : null}
         </View>
       </View>
 
-      <View style={styles.tagsRow}>
+      <View
+        style={
+          styles.tagsRow
+        }
+      >
         {outfit.occasion && (
-          <Text style={styles.tagChip}>
-            🎯 {outfit.occasion}
+          <Text
+            style={
+              styles.tagChip
+            }
+          >
+            🎯{' '}
+            {outfit.occasion}
           </Text>
         )}
 
         {outfit.weather && (
-          <Text style={styles.tagChip}>
-            🌦 {outfit.weather}
-          </Text>
-        )}
-
-        {outfit.season && (
-          <Text style={styles.tagChip}>
-            🍂 {outfit.season}
+          <Text
+            style={
+              styles.tagChip
+            }
+          >
+            ☀️{' '}
+            {outfit.weather}
           </Text>
         )}
       </View>
 
-      <View style={styles.mainScoreCard}>
-        <Text style={styles.mainScoreValue}>
+      <View
+        style={
+          styles.mainScoreCard
+        }
+      >
+        <Text
+          style={
+            styles.mainScoreValue
+          }
+        >
           {matchScore}%
         </Text>
 
-        <Text style={styles.mainScoreLabel}>
-          Triple N Match
+        <Text
+          style={
+            styles.mainScoreLabel
+          }
+        >
+          {t(
+            'details.match'
+          )}
         </Text>
       </View>
 
-      <View style={styles.scoreGrid}>
+      <View
+        style={
+          styles.scoreGrid
+        }
+      >
         <ScoreCard
           emoji="🎨"
-          value={colorScore}
-          label="Colors"
+          value={
+            colorScore
+          }
+          label={t(
+            'outfit.colors'
+          )}
         />
 
         <ScoreCard
           emoji="✨"
-          value={styleScore}
-          label="Style"
+          value={
+            styleScore
+          }
+          label={t(
+            'outfit.style'
+          )}
         />
 
         <ScoreCard
-          emoji="🌦"
-          value={weatherScore}
-          label="Weather"
-        />
-
-        <ScoreCard
-          emoji="🍂"
-          value={seasonScore}
-          label="Season"
+          emoji="☀️"
+          value={
+            weatherScore
+          }
+          label={t(
+            'outfit.weather'
+          )}
         />
       </View>
 
-      <View style={styles.preview}>
-        <View style={styles.previewCanvasBox}>
+      <View
+        ref={previewRef}
+        collapsable={false}
+        style={
+          styles.preview
+        }
+      >
+        <View
+          style={
+            styles.previewCanvasBox
+          }
+        >
           <OutfitCanvas
             outfit={{
-              top: outfit.top,
+              top:
+                outfit.top,
+
               bottom,
-              shoes: outfit.shoes,
-              jacket: outfit.jacket,
+
+              shoes:
+                outfit.shoes,
+
+              /**
+               * Summer V1:
+               * لا يتم عرض الجاكيت،
+               * حتى داخل الأطقم القديمة.
+               */
+              jacket:
+                null,
+
+              bag:
+                outfit.bag ||
+                null,
+
+              cap:
+                outfit.cap ||
+                null,
+
+              watch:
+                outfit.watch ||
+                null,
+
               accessory:
-                outfit.accessory || null,
+                outfit.accessory ||
+                null,
             }}
             variant="details"
           />
         </View>
+
+        <View
+          style={
+            styles.previewBrand
+          }
+        >
+          <Text
+            style={
+              styles.previewBrandText
+            }
+          >
+            TRIPLE N
+          </Text>
+
+          <Text
+            style={
+              styles.previewBrandSubtitle
+            }
+          >
+            AI FASHION ASSISTANT
+          </Text>
+        </View>
       </View>
 
-      <View style={styles.actionsRow}>
+      <View
+        style={
+          styles.actionsRow
+        }
+      >
         <TouchableOpacity
           style={[
             styles.actionButton,
+
             rowFavorite &&
               styles.activeActionButton,
           ]}
-          onPress={toggleFavorite}
+          onPress={
+            toggleFavorite
+          }
         >
           <Ionicons
             name={
@@ -379,8 +722,12 @@ Made with Triple N ✨`,
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.actionButton}
-          onPress={openPreview}
+          style={
+            styles.actionButton
+          }
+          onPress={
+            showTryOnComingSoon
+          }
         >
           <Ionicons
             name="eye-outline"
@@ -390,20 +737,46 @@ Made with Triple N ✨`,
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.actionButton}
-          onPress={shareOutfit}
+          style={[
+            styles.actionButton,
+
+            sharing &&
+              styles.disabledActionButton,
+          ]}
+          onPress={
+            shareOutfit
+          }
+          disabled={
+            sharing
+          }
         >
-          <Ionicons
-            name="share-outline"
-            size={24}
-            color="white"
-          />
+          {sharing ? (
+            <ActivityIndicator
+              size="small"
+              color="white"
+            />
+          ) : (
+            <Ionicons
+              name="share-outline"
+              size={24}
+              color="white"
+            />
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.actionButton}
-          onPress={deleteOutfit}
-          disabled={deleting}
+          style={[
+            styles.actionButton,
+
+            deleting &&
+              styles.disabledActionButton,
+          ]}
+          onPress={
+            deleteOutfit
+          }
+          disabled={
+            deleting
+          }
         >
           {deleting ? (
             <ActivityIndicator
@@ -420,32 +793,78 @@ Made with Triple N ✨`,
         </TouchableOpacity>
       </View>
 
-      <View style={styles.aiCard}>
-        <Text style={styles.aiTitle}>
-          AI Insight
+      <View
+        style={
+          styles.aiCard
+        }
+      >
+        <Text
+          style={
+            styles.aiTitle
+          }
+        >
+          {t(
+            'details.aiInsight'
+          )}
         </Text>
 
-        {explanation.length > 0 ? (
+        {explanation.length >
+        0 ? (
           explanation
-            .slice(0, 5)
-            .map((reason, index) => (
-              <Text
-                key={`${reason}-${index}`}
-                style={styles.aiText}
-              >
-                • {reason}
-              </Text>
-            ))
+            .slice(
+              0,
+              5
+            )
+            .map(
+              (
+                reason,
+                index
+              ) => (
+                <Text
+                  key={`${reason}-${index}`}
+                  style={
+                    styles.aiText
+                  }
+                >
+                  • {reason}
+                </Text>
+              )
+            )
         ) : (
-          <Text style={styles.aiText}>
-            • Strong balance between the selected
-            pieces.
-            {'\n'}
-            • The colors and categories create a
-            complete outfit.
-            {'\n'}
-            • This outfit fits the saved context.
-          </Text>
+          <>
+            <Text
+              style={
+                styles.aiText
+              }
+            >
+              •{' '}
+              {t(
+                'details.defaultInsightOne'
+              )}
+            </Text>
+
+            <Text
+              style={
+                styles.aiText
+              }
+            >
+              •{' '}
+              {t(
+                'details.defaultInsightTwo'
+              )}
+            </Text>
+
+            <Text
+              style={
+                styles.aiText
+              }
+            >
+              •{' '}
+              {t(
+                'details.defaultInsightThree'
+              )}
+            </Text>
+          </>
         )}
       </View>
     </ScrollView>
@@ -462,225 +881,327 @@ function ScoreCard({
   label: string;
 }) {
   return (
-    <View style={styles.scoreCard}>
-      <Text style={styles.scoreEmoji}>
+    <View
+      style={
+        styles.scoreCard
+      }
+    >
+      <Text
+        style={
+          styles.scoreEmoji
+        }
+      >
         {emoji}
       </Text>
 
-      <Text style={styles.scoreValue}>
+      <Text
+        style={
+          styles.scoreValue
+        }
+      >
         {value}%
       </Text>
 
-      <Text style={styles.scoreLabel}>
+      <Text
+        style={
+          styles.scoreLabel
+        }
+      >
         {label}
       </Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#07090d',
-  },
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor:
+        '#07090d',
+    },
 
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#07090d',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+    loadingContainer: {
+      flex: 1,
+      backgroundColor:
+        '#07090d',
+      justifyContent:
+        'center',
+      alignItems:
+        'center',
+    },
 
-  loadingText: {
-    color: '#aaa',
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 14,
-  },
+    loadingText: {
+      color: '#aaa',
+      fontSize: 14,
+      fontWeight:
+        '700',
+      marginTop: 14,
+    },
 
-  emptyContainer: {
-    flex: 1,
-    backgroundColor: '#07090d',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+    emptyContainer: {
+      flex: 1,
+      backgroundColor:
+        '#07090d',
+      justifyContent:
+        'center',
+      alignItems:
+        'center',
+    },
 
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 45,
-  },
+    content: {
+      paddingHorizontal: 20,
+      paddingTop: 60,
+      paddingBottom: 45,
+    },
 
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 18,
-  },
+    header: {
+      flexDirection:
+        'row',
+      alignItems:
+        'center',
+      marginBottom: 18,
+    },
 
-  headerText: {
-    flex: 1,
-  },
+    headerText: {
+      flex: 1,
+    },
 
-  backIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#17191d',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
+    backIcon: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor:
+        '#17191d',
+      justifyContent:
+        'center',
+      alignItems:
+        'center',
+      marginRight: 14,
+    },
 
-  title: {
-    color: 'white',
-    fontSize: 30,
-    fontWeight: '900',
-  },
+    title: {
+      color: 'white',
+      fontSize: 30,
+      fontWeight:
+        '900',
+    },
 
-  date: {
-    color: '#8f9299',
-    fontSize: 15,
-    fontWeight: '800',
-    marginTop: 4,
-  },
+    date: {
+      color: '#8f9299',
+      fontSize: 15,
+      fontWeight:
+        '800',
+      marginTop: 4,
+    },
 
-  tagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
+    tagsRow: {
+      flexDirection:
+        'row',
+      flexWrap:
+        'wrap',
+      gap: 8,
+      marginBottom: 16,
+    },
 
-  tagChip: {
-    color: '#facc15',
-    backgroundColor: '#17191d',
-    borderWidth: 1,
-    borderColor: '#2a2d33',
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 18,
-    fontSize: 13,
-    fontWeight: '900',
-  },
+    tagChip: {
+      color: '#facc15',
+      backgroundColor:
+        '#17191d',
+      borderWidth: 1,
+      borderColor:
+        '#2a2d33',
+      paddingHorizontal: 13,
+      paddingVertical: 8,
+      borderRadius: 18,
+      fontSize: 13,
+      fontWeight:
+        '900',
+    },
 
-  mainScoreCard: {
-    backgroundColor: '#17191d',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#2a2d33',
-    alignItems: 'center',
-    paddingVertical: 16,
-    marginBottom: 12,
-  },
+    mainScoreCard: {
+      backgroundColor:
+        '#17191d',
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor:
+        '#2a2d33',
+      alignItems:
+        'center',
+      paddingVertical: 16,
+      marginBottom: 12,
+    },
 
-  mainScoreValue: {
-    color: '#f59e0b',
-    fontSize: 32,
-    fontWeight: '900',
-  },
+    mainScoreValue: {
+      color: '#f59e0b',
+      fontSize: 32,
+      fontWeight:
+        '900',
+    },
 
-  mainScoreLabel: {
-    color: '#999',
-    fontSize: 12,
-    fontWeight: '800',
-    marginTop: 3,
-  },
+    mainScoreLabel: {
+      color: '#999',
+      fontSize: 12,
+      fontWeight:
+        '800',
+      marginTop: 3,
+    },
 
-  scoreGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 18,
-  },
+    scoreGrid: {
+      flexDirection:
+        'row',
+      flexWrap:
+        'wrap',
+      justifyContent:
+        'space-between',
+      marginBottom: 18,
+    },
 
-  scoreCard: {
-    width: '48%',
-    backgroundColor: '#17191d',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#2a2d33',
-    alignItems: 'center',
-    paddingVertical: 12,
-    marginBottom: 10,
-  },
+    scoreCard: {
+      width: '48%',
+      backgroundColor:
+        '#17191d',
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor:
+        '#2a2d33',
+      alignItems:
+        'center',
+      paddingVertical: 12,
+      marginBottom: 10,
+    },
 
-  scoreEmoji: {
-    fontSize: 18,
-  },
+    scoreEmoji: {
+      fontSize: 18,
+    },
 
-  scoreValue: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: '900',
-    marginTop: 3,
-  },
+    scoreValue: {
+      color: 'white',
+      fontSize: 20,
+      fontWeight:
+        '900',
+      marginTop: 3,
+    },
 
-  scoreLabel: {
-    color: '#888',
-    fontSize: 10,
-    fontWeight: '800',
-    marginTop: 2,
-  },
+    scoreLabel: {
+      color: '#888',
+      fontSize: 10,
+      fontWeight:
+        '800',
+      marginTop: 2,
+    },
 
-  preview: {
-    height: 500,
-    backgroundColor: '#f4efe6',
-    borderRadius: 34,
-    borderWidth: 1.5,
-    borderColor: '#2a2d33',
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 4,
-  },
+    preview: {
+      height: 500,
+      backgroundColor:
+        '#f4efe6',
+      borderRadius: 34,
+      borderWidth: 1.5,
+      borderColor:
+        '#2a2d33',
+      overflow:
+        'hidden',
+      justifyContent:
+        'center',
+      alignItems:
+        'center',
+      marginTop: 4,
+      position:
+        'relative',
+    },
 
-  previewCanvasBox: {
-    transform: [{ scale: 1.08 }],
-  },
+    previewCanvasBox: {
+      transform: [
+        {
+          scale: 1.08,
+        },
+      ],
+    },
 
-  actionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    marginVertical: 24,
-  },
+    previewBrand: {
+      position:
+        'absolute',
+      bottom: 18,
+      alignItems:
+        'center',
+    },
 
-  actionButton: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: '#17191d',
-    borderWidth: 1,
-    borderColor: '#2a2d33',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+    previewBrandText: {
+      color: '#17191d',
+      fontSize: 14,
+      fontWeight:
+        '900',
+      letterSpacing: 3,
+    },
 
-  activeActionButton: {
-    backgroundColor: '#f4dfc8',
-    borderColor: '#f4dfc8',
-  },
+    previewBrandSubtitle: {
+      color: '#555',
+      fontSize: 7,
+      fontWeight:
+        '800',
+      letterSpacing: 1.4,
+      marginTop: 2,
+    },
 
-  aiCard: {
-    backgroundColor: '#17191d',
-    borderRadius: 26,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: '#2a2d33',
-    marginBottom: 35,
-  },
+    actionsRow: {
+      flexDirection:
+        'row',
+      justifyContent:
+        'space-evenly',
+      marginVertical: 24,
+    },
 
-  aiTitle: {
-    color: 'white',
-    fontSize: 22,
-    fontWeight: '900',
-    marginBottom: 12,
-  },
+    actionButton: {
+      width: 62,
+      height: 62,
+      borderRadius: 31,
+      backgroundColor:
+        '#17191d',
+      borderWidth: 1,
+      borderColor:
+        '#2a2d33',
+      justifyContent:
+        'center',
+      alignItems:
+        'center',
+    },
 
-  aiText: {
-    color: '#9ca3af',
-    lineHeight: 23,
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 5,
-  },
-});
+    activeActionButton: {
+      backgroundColor:
+        '#f4dfc8',
+      borderColor:
+        '#f4dfc8',
+    },
+
+    disabledActionButton: {
+      opacity: 0.55,
+    },
+
+    aiCard: {
+      backgroundColor:
+        '#17191d',
+      borderRadius: 26,
+      padding: 22,
+      borderWidth: 1,
+      borderColor:
+        '#2a2d33',
+      marginBottom: 35,
+    },
+
+    aiTitle: {
+      color: 'white',
+      fontSize: 22,
+      fontWeight:
+        '900',
+      marginBottom: 12,
+    },
+
+    aiText: {
+      color: '#9ca3af',
+      lineHeight: 23,
+      fontSize: 14,
+      fontWeight:
+        '700',
+      marginBottom: 5,
+    },
+  });
