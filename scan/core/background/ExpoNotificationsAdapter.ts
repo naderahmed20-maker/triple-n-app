@@ -25,21 +25,21 @@
 // BackgroundProcessingNotifications.ts
 
 import {
-    Platform,
+  Platform,
 } from 'react-native';
 
 import * as Notifications from 'expo-notifications';
 
 import type {
-    ProcessingNotificationPayload,
+  ProcessingNotificationPayload,
 } from '../queue/QueueTypes';
 
 import type {
-    ProcessingNotificationAdapter,
-    ProcessingNotificationPermissionResult,
-    ProcessingNotificationPermissionStatus,
-    ProcessingNotificationResponse,
-    ProcessingNotificationSendResult,
+  ProcessingNotificationAdapter,
+  ProcessingNotificationPermissionResult,
+  ProcessingNotificationPermissionStatus,
+  ProcessingNotificationResponse,
+  ProcessingNotificationSendResult,
 } from './BackgroundProcessingNotifications';
 
 /* =========================================================
@@ -1001,12 +1001,80 @@ export class ExpoNotificationsAdapter
         }
       }
 
-      this.attachResponseListener();
+    this.attachResponseListener();
 
-      this.permission =
-        await this
-          .getPermissionStatus();
+/**
+ * استعادة ضغط الإشعار الذي فتح التطبيق
+ * من الحالة المغلقة، خصوصًا على iOS.
+ */
+try {
+  const lastResponse =
+    await Notifications
+      .getLastNotificationResponseAsync();
 
+  if (
+    lastResponse
+  ) {
+    const converted =
+      createNotificationResponse(
+        lastResponse
+      );
+
+    this.updateDiagnostics({
+      responseCount:
+        this.diagnostics
+          .responseCount +
+      1,
+
+      lastNotificationId:
+        converted
+          .notificationId,
+
+      lastOperationAt:
+        now(),
+    });
+
+    try {
+      this.responseHandler(
+        converted
+      );
+    } catch (
+      error:
+        unknown
+    ) {
+      this.logWarning(
+        'Initial notification response handler failed.',
+        error
+      );
+    }
+
+    try {
+      await Notifications
+        .clearLastNotificationResponseAsync();
+    } catch (
+      error:
+        unknown
+    ) {
+      this.logWarning(
+        'Could not clear the last notification response.',
+        error
+      );
+    }
+  }
+} catch (
+  error:
+    unknown
+) {
+  this.logWarning(
+    'Could not restore the initial notification response.',
+    error
+  );
+}
+
+this.permission =
+  await this
+    .getPermissionStatus();
+    
       this.initialized =
         true;
 

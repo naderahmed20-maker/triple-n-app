@@ -21,28 +21,28 @@
 // - AndroidBackgroundProcessingDriver.ts
 
 import {
-    Platform,
+  Platform,
 } from 'react-native';
 
 import type {
-    ProcessingPlatform,
+  ProcessingPlatform,
 } from '../queue/QueueTypes';
 
 import type {
-    ScanItemQueueService,
+  ScanItemQueueService,
 } from '../services/ScanItemQueueService';
 
 import {
-    getDefaultScanItemQueueService,
+  getDefaultScanItemQueueService,
 } from '../services/ScanItemQueueService';
 
 import type {
-    BackgroundProcessingDriver,
-    BackgroundProcessingServiceOptions,
+  BackgroundProcessingDriver,
+  BackgroundProcessingServiceOptions,
 } from '../services/BackgroundProcessingService';
 
 import {
-    BackgroundProcessingService,
+  BackgroundProcessingService,
 } from '../services/BackgroundProcessingService';
 
 /* =========================================================
@@ -693,6 +693,10 @@ export class BackgroundProcessingRegistry {
         stopNativeTaskWhenQueueCompletes:
           options
             .stopNativeTaskWhenQueueCompletes,
+
+            manageApplicationStateInternally:
+  options
+    .manageApplicationStateInternally,
 
         enableDebugLogs:
           options.enableDebugLogs,

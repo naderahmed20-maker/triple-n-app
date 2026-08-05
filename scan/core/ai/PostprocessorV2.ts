@@ -12879,7 +12879,7 @@ export class SegmentationPostprocessorV2 {
     createFloatMask(
       workingMask.width,
       workingMask.height,
-      v3RefinedReference.data,
+      safelyMergedData,
       requestId,
       'refine-alpha-mask'
     );

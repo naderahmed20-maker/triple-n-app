@@ -1299,6 +1299,50 @@ export default function WardrobeScreen() {
    * Render
    * ===================================================== */
 
+  const processingJobs =
+  queueSnapshot
+    ?.jobs
+    .filter(
+      job =>
+        job.status ===
+          'queued' ||
+        job.status ===
+          'preparing' ||
+        job.status ===
+          'processing' ||
+        job.status ===
+          'retry-scheduled' ||
+        job.status ===
+          'interrupted'
+    ) ??
+  [];
+
+const remainingProcessingItemCount =
+  processingJobs.length;
+
+const estimatedRemainingMs =
+  queueSnapshot
+    ?.timing
+    .estimatedRemainingMs ??
+  queueSnapshot
+    ?.statistics
+    .estimatedRemainingMs ??
+  null;
+
+const estimatedRemainingMinutes =
+  estimatedRemainingMs !==
+    null &&
+  estimatedRemainingMs >
+    0
+    ? Math.max(
+        1,
+        Math.ceil(
+          estimatedRemainingMs /
+            60000
+        )
+      )
+    : null;
+
   return (
     <ImageBackground
       source={require(
@@ -1398,6 +1442,88 @@ export default function WardrobeScreen() {
                   </Text>
                 </View>
               </View>
+
+              {remainingProcessingItemCount >
+0 ? (
+  <View
+    style={{
+      marginHorizontal:
+        16,
+
+      marginTop:
+        12,
+
+      marginBottom:
+        10,
+
+      paddingHorizontal:
+        14,
+
+      paddingVertical:
+        12,
+
+      borderRadius:
+        14,
+
+      backgroundColor:
+        'rgba(0, 0, 0, 0.72)',
+    }}
+  >
+    <Text
+      style={{
+        color:
+          '#FFFFFF',
+
+        fontSize:
+          15,
+
+        fontWeight:
+          '700',
+
+        textAlign:
+          'center',
+      }}
+    >
+      {estimatedRemainingMinutes !==
+      null
+        ? `Processing ${remainingProcessingItemCount} ${
+            remainingProcessingItemCount ===
+            1
+              ? 'item'
+              : 'items'
+          } · About ${estimatedRemainingMinutes} ${
+            estimatedRemainingMinutes ===
+            1
+              ? 'minute'
+              : 'minutes'
+          } remaining`
+        : `Processing ${remainingProcessingItemCount} ${
+            remainingProcessingItemCount ===
+            1
+              ? 'item'
+              : 'items'
+          }`}
+    </Text>
+
+    <Text
+      style={{
+        color:
+          'rgba(255, 255, 255, 0.78)',
+
+        fontSize:
+          12,
+
+        marginTop:
+          4,
+
+        textAlign:
+          'center',
+      }}
+    >
+      You can leave the app running in the background.
+    </Text>
+  </View>
+) : null}
 
               <TextInput
                 style={

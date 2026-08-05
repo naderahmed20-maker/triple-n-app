@@ -841,10 +841,10 @@ export const EDGESAM_EMBEDDING_CACHE_CONFIG:
     2 * 60 * 1000,
 
   disposeAfterRequest:
-    false,
+    true,
 
   retainLatestEmbedding:
-    true,
+    false,
 };
 
 /* =========================================================

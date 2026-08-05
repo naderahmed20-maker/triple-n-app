@@ -1,21 +1,86 @@
+// modules/triple-n-background/src/index.ts
+//
+// Triple N - Shared Native Background Module Entry
+//
+// هذا الملف يربط JavaScript بالموديول المشترك:
+//
+// - iOS:
+//   TripleNBackgroundModule.swift
+//
+// - Android:
+//   TripleNBackgroundModule.kt
+//
+// ملاحظة:
+//
+// TripleNNativeProcessing الخاص بمعالجة EdgeSAM على iOS
+// لا يتم تحميله من هذا الملف.
+//
+// الربط الخاص به موجود بالفعل داخل:
+//
+// scan/core/native/NativeProcessingBridge.ts
+//
+// وبذلك لا نحاول تحميل TripleNNativeProcessing على Android
+// حيث إنه غير مسجل حاليًا كموديول Android مستقل.
+//
+
 import {
-    NativeModule,
-    requireNativeModule,
+  NativeModule,
+  requireNativeModule,
 } from 'expo';
+
+/* =========================================================
+ * Shared contracts
+ * ======================================================= */
 
 export type TripleNBackgroundEventSubscription = {
   remove:
     () => void;
 };
 
-export type TripleNBackgroundState =
+export type TripleNBackgroundPlatform =
+  | 'ios'
+  | 'android';
+
+export type TripleNBackgroundDictionary =
   Record<
     string,
     unknown
   >;
 
+export type TripleNBackgroundState =
+  TripleNBackgroundDictionary;
+
 export type TripleNBackgroundEventPayload =
   TripleNBackgroundState;
+
+/* =========================================================
+ * Availability result
+ * ======================================================= */
+
+export type TripleNBackgroundAvailabilityResult = {
+  available:
+    boolean;
+
+  platform:
+    TripleNBackgroundPlatform;
+
+  executor:
+    string;
+
+  applicationState?:
+    string;
+
+  backgroundTimeRemaining?:
+    number;
+
+  [key:
+    string]:
+    unknown;
+};
+
+/* =========================================================
+ * Event contract
+ * ======================================================= */
 
 export type TripleNBackgroundModuleEvents = {
   onBackgroundTaskStarted:
@@ -43,28 +108,25 @@ export type TripleNBackgroundModuleEvents = {
     ) => void;
 };
 
+/* =========================================================
+ * Native module contract
+ * ======================================================= */
+
 declare class TripleNBackgroundNativeModule
   extends NativeModule<
     TripleNBackgroundModuleEvents
   > {
 
+  readonly platform?:
+    TripleNBackgroundPlatform;
+
+  readonly available?:
+    boolean;
+
   isAvailable():
-    Promise<{
-      available:
-        boolean;
-
-      platform:
-        'ios';
-
-      executor:
-        string;
-
-      applicationState:
-        string;
-
-      backgroundTimeRemaining:
-        number;
-    }>;
+    Promise<
+      TripleNBackgroundAvailabilityResult
+    >;
 
   startBackgroundTask(
     taskId:
@@ -104,15 +166,27 @@ declare class TripleNBackgroundNativeModule
     >;
 }
 
-const nativeModule =
+/* =========================================================
+ * Native module instance
+ * ======================================================= */
+
+const tripleNBackgroundNativeModule =
   requireNativeModule<
     TripleNBackgroundNativeModule
   >(
     'TripleNBackground'
   );
 
+/* =========================================================
+ * Public module export
+ * ======================================================= */
+
 export const TripleNBackground =
-  nativeModule;
+  tripleNBackgroundNativeModule;
+
+/* =========================================================
+ * Event listeners
+ * ======================================================= */
 
 export function addBackgroundTaskStartedListener(
   listener:
@@ -121,7 +195,7 @@ export function addBackgroundTaskStartedListener(
         TripleNBackgroundEventPayload
     ) => void
 ): TripleNBackgroundEventSubscription {
-  return nativeModule
+  return tripleNBackgroundNativeModule
     .addListener(
       'onBackgroundTaskStarted',
       listener
@@ -135,7 +209,7 @@ export function addBackgroundTaskProgressListener(
         TripleNBackgroundEventPayload
     ) => void
 ): TripleNBackgroundEventSubscription {
-  return nativeModule
+  return tripleNBackgroundNativeModule
     .addListener(
       'onBackgroundTaskProgress',
       listener
@@ -149,7 +223,7 @@ export function addBackgroundTaskExpiredListener(
         TripleNBackgroundEventPayload
     ) => void
 ): TripleNBackgroundEventSubscription {
-  return nativeModule
+  return tripleNBackgroundNativeModule
     .addListener(
       'onBackgroundTaskExpired',
       listener
@@ -163,11 +237,15 @@ export function addBackgroundTaskStoppedListener(
         TripleNBackgroundEventPayload
     ) => void
 ): TripleNBackgroundEventSubscription {
-  return nativeModule
+  return tripleNBackgroundNativeModule
     .addListener(
       'onBackgroundTaskStopped',
       listener
     );
 }
 
-export default nativeModule;
+/* =========================================================
+ * Default export
+ * ======================================================= */
+
+export default tripleNBackgroundNativeModule;

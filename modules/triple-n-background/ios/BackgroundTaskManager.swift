@@ -10,8 +10,14 @@ final class BackgroundTaskManager {
   static let shared =
     BackgroundTaskManager()
 
-  static let taskIdentifier =
-    "com.naderahmed22.triplen.scan-processing"
+ static let taskIdentifierBase =
+  "com.naderahmed22.triplen.scan-processing"
+
+static let permittedTaskIdentifier =
+  "com.naderahmed22.triplen.scan-processing.*"
+
+static let taskIdentifier =
+  "com.naderahmed22.triplen.scan-processing.main"
 
   enum ManagerState:
     String {
@@ -87,13 +93,12 @@ final class BackgroundTaskManager {
     Double =
       0.0
 
-  private var startedAt:
-    TimeInterval?
+ private var startedAt:
+  NativeProcessingTimestamp?
 
-  private var updatedAt:
-    TimeInterval =
-      Date()
-        .timeIntervalSince1970
+private var updatedAt:
+  NativeProcessingTimestamp =
+    NativeProcessingTime.now()
 
   private var lastErrorCode:
     String?
@@ -119,8 +124,7 @@ final class BackgroundTaskManager {
    * Public availability
    * ===================================================== */
 
-  func isSupported():
-    Bool {
+  func isSupported() -> Bool {
 #if compiler(>=6.2)
     if #available(
       iOS 26.0,
@@ -516,8 +520,7 @@ final class BackgroundTaskManager {
    * Public state
    * ===================================================== */
 
-  func createStatePayload():
-    [String: Any] {
+  func createStatePayload() -> [String: Any] {
     let identifierValue:
       Any =
         currentIdentifier ??
@@ -622,8 +625,7 @@ final class BackgroundTaskManager {
     iOS 26.0,
     *
   )
-  private func getIOS26State():
-    IOS26State {
+  private func getIOS26State() -> IOS26State {
     if
       let existing =
         ios26State as?
@@ -1170,11 +1172,10 @@ final class BackgroundTaskManager {
       : normalized
   }
 
-  private func now():
-    TimeInterval {
-    return Date()
-      .timeIntervalSince1970
-  }
+private func now()
+  -> NativeProcessingTimestamp {
+  NativeProcessingTime.now()
+}
 
   private func clearCallbacks() {
     expirationCallback =

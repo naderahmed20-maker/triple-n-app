@@ -27,27 +27,27 @@
 // ExpoNotificationsAdapter.ts
 
 import type {
-    ProcessingBatchId,
-    ProcessingJob,
-    ProcessingJobError,
-    ProcessingJobId,
-    ProcessingNotificationKind,
-    ProcessingNotificationPayload,
-    ProcessingQueueEvent,
-    ProcessingQueueSnapshot,
-    ProcessingTimestamp,
+  ProcessingBatchId,
+  ProcessingJob,
+  ProcessingJobError,
+  ProcessingJobId,
+  ProcessingNotificationKind,
+  ProcessingNotificationPayload,
+  ProcessingQueueEvent,
+  ProcessingQueueSnapshot,
+  ProcessingTimestamp,
 } from '../queue/QueueTypes';
 
 import type {
-    ProcessingQueueEventSubscription,
+  ProcessingQueueEventSubscription,
 } from '../queue/QueueEvents';
 
 import type {
-    ScanItemQueueService,
+  ScanItemQueueService,
 } from '../services/ScanItemQueueService';
 
 import {
-    getDefaultScanItemQueueService,
+  getDefaultScanItemQueueService,
 } from '../services/ScanItemQueueService';
 
 /* =========================================================
@@ -996,6 +996,11 @@ export class BackgroundProcessingNotifications {
       string
     >();
 
+    private pendingSendKeys =
+  new Set<
+    string
+  >();
+
   private sentNotificationIds =
     new Set<
       string
@@ -1547,12 +1552,17 @@ export class BackgroundProcessingNotifications {
         payload
       );
 
-    if (
-      !allowDuplicate &&
-      this.sentKeys.has(
-        notificationKey
-      )
-    ) {
+  if (
+  !allowDuplicate &&
+  (
+    this.sentKeys.has(
+      notificationKey
+    ) ||
+    this.pendingSendKeys.has(
+      notificationKey
+    )
+  )
+) {
       this.diagnostics = {
         ...this.diagnostics,
 
@@ -1573,6 +1583,14 @@ export class BackgroundProcessingNotifications {
           'This notification has already been sent.',
       };
     }
+
+    if (
+  !allowDuplicate
+) {
+  this.pendingSendKeys.add(
+    notificationKey
+  );
+}
 
     try {
       const result =
@@ -1706,6 +1724,16 @@ export class BackgroundProcessingNotifications {
         errorMessage:
           message,
       };
+    }
+
+    finally {
+  if (
+    !allowDuplicate
+  ) {
+    this.pendingSendKeys.delete(
+      notificationKey
+    );
+  }
     }
   }
 
@@ -2023,6 +2051,7 @@ export class BackgroundProcessingNotifications {
     }
 
     this.sentKeys.clear();
+    this.pendingSendKeys.clear();
     this.sentNotificationIds.clear();
 
     this.initialized =

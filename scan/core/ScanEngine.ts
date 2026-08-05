@@ -2253,12 +2253,19 @@ function runQualityPostCheck(
           qualityMask
         );
 
-  context.qualityResult =
-    qualityResult;
+ context.qualityResult =
+  qualityResult;
 
-  if (
-    !qualityResult
-      .accepted &&
+if (__DEV__) {
+  console.log(
+    'SCAN QUALITY RESULT:',
+    qualityResult.debugSummary
+  );
+}
+
+if (
+  !qualityResult
+    .accepted &&
     context.config
       .quality
       .rejectOnPostFailure

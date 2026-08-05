@@ -31,37 +31,37 @@
 // → BackgroundProcessingService
 
 import {
-    AppState,
-    type AppStateStatus,
-    type NativeEventSubscription,
+  AppState,
+  type AppStateStatus,
+  type NativeEventSubscription,
 } from 'react-native';
 
 import type {
-    ProcessingApplicationState,
-    ProcessingBackgroundCapability,
-    ProcessingQueueSnapshot,
-    ProcessingQueueStatus,
-    ProcessingTimestamp,
+  ProcessingApplicationState,
+  ProcessingBackgroundCapability,
+  ProcessingQueueSnapshot,
+  ProcessingQueueStatus,
+  ProcessingTimestamp,
 } from '../queue/QueueTypes';
 
 import type {
-    ScanItemQueueService,
+  ScanItemQueueService,
 } from '../services/ScanItemQueueService';
 
 import {
-    getDefaultScanItemQueueService,
+  getDefaultScanItemQueueService,
 } from '../services/ScanItemQueueService';
 
 import type {
-    BackgroundProcessingCapabilityResult,
-    BackgroundProcessingService,
-    BackgroundProcessingServiceSnapshot,
-    BackgroundProcessingStartResult,
-    BackgroundProcessingStopResult,
+  BackgroundProcessingCapabilityResult,
+  BackgroundProcessingService,
+  BackgroundProcessingServiceSnapshot,
+  BackgroundProcessingStartResult,
+  BackgroundProcessingStopResult,
 } from '../services/BackgroundProcessingService';
 
 import {
-    getRegisteredBackgroundProcessingService,
+  getRegisteredBackgroundProcessingService,
 } from './BackgroundProcessingRegistry';
 
 /* =========================================================
@@ -801,28 +801,31 @@ export class BackgroundProcessingAppLifecycle {
         options.config
       );
 
-    this.backgroundService =
-      options.backgroundService ??
-      getRegisteredBackgroundProcessingService({
-        queueService:
-          this.queueService,
+this.backgroundService =
+  options.backgroundService ??
+  getRegisteredBackgroundProcessingService({
+    queueService:
+      this.queueService,
 
-        autoInitialize:
-          false,
+    autoInitialize:
+      false,
 
-        autoStartWhenPending:
-          true,
+    autoStartWhenPending:
+      true,
 
-        resumeQueueWhenApplicationBecomesActive:
-          true,
+    resumeQueueWhenApplicationBecomesActive:
+      true,
 
-        stopNativeTaskWhenQueueCompletes:
-          true,
+    stopNativeTaskWhenQueueCompletes:
+      true,
 
-        enableDebugLogs:
-          this.config
-            .enableDebugLogs,
-      });
+    manageApplicationStateInternally:
+      false,
+
+    enableDebugLogs:
+      this.config
+        .enableDebugLogs,
+  });
 
     this.onTransition =
       options.onTransition ??

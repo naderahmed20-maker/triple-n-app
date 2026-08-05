@@ -30,6 +30,8 @@ import {
 
 import type {
   ProcessingJob,
+  ProcessingJobError,
+  ProcessingJobExecutionResult,
   ProcessingQueueSnapshot,
 } from '../queue/QueueTypes';
 
@@ -37,11 +39,11 @@ import type {
   ProcessingQueueInitializeResult,
 } from '../queue/ProcessingQueue';
 
-import {
-  createScanItemProcessingExecutor,
-  type ScanItemProcessingExecutor,
-  type ScanItemProcessingExecutorDiagnostics,
-} from '../services/ScanItemProcessingExecutor';
+import type {
+  LocalScanItemFileInspector,
+  LocalScanItemTemporaryFileCleaner,
+  LocalScanItemWardrobeUpdater,
+} from '../services/LocalScanItemProcessingAdapter';
 
 import {
   getDefaultScanItemQueueService,
@@ -50,13 +52,10 @@ import {
 } from '../services/ScanItemQueueService';
 
 import {
-  createLocalScanItemProcessingAdapter,
-  type LocalScanItemFileInspector,
-  type LocalScanItemProcessingAdapter,
-  type LocalScanItemProcessingAdapterDiagnostics,
-  type LocalScanItemTemporaryFileCleaner,
-  type LocalScanItemWardrobeUpdater,
-} from '../services/LocalScanItemProcessingAdapter';
+  createNativeProcessingQueueExecutor,
+  type NativeProcessingQueueExecutor,
+  type NativeProcessingQueueExecutorDiagnostics,
+} from '../native/NativeProcessingQueueExecutor';
 
 import type {
   BackgroundProcessingCapabilityResult,
@@ -323,11 +322,8 @@ export type BackgroundProcessingBootstrapDiagnostics = {
   queue:
     ScanItemQueueServiceDiagnostics | null;
 
-  adapter:
-    LocalScanItemProcessingAdapterDiagnostics | null;
-
-  executor:
-    ScanItemProcessingExecutorDiagnostics | null;
+    executor:
+  NativeProcessingQueueExecutorDiagnostics | null;
 
   registry:
     BackgroundProcessingRegistryDiagnostics | null;
@@ -353,11 +349,8 @@ type BackgroundProcessingRuntime = {
   queueService:
     ScanItemQueueService;
 
-  adapter:
-    LocalScanItemProcessingAdapter;
-
-  executor:
-    ScanItemProcessingExecutor;
+    executor:
+  NativeProcessingQueueExecutor;
 
   registry:
     BackgroundProcessingRegistry;
@@ -606,6 +599,78 @@ function combineWarnings(
   return result;
 }
 
+function createWardrobeUpdateFailureResult(
+  job:
+    ProcessingJob,
+  message:
+    string,
+  processedImageUri:
+    string
+): ProcessingJobExecutionResult {
+  const error:
+    ProcessingJobError = {
+    code:
+      'WARDROBE_ITEM_UPDATE_FAILED',
+
+    message,
+
+    source:
+      'wardrobe',
+
+    retryable:
+      true,
+
+    occurredAt:
+      now(),
+
+    attempt:
+      job.retry.attempt,
+
+    stage:
+      'update-wardrobe-item',
+
+    nativeCode:
+      null,
+
+    segmentationErrorCode:
+      null,
+
+    metadata: {
+      jobId:
+        job.id,
+
+      queueId:
+        job.queueId,
+
+      batchId:
+        job.batchId,
+
+      requestId:
+        job.requestId,
+
+      wardrobeItemId:
+        job.wardrobeItemId,
+
+      processedImageUri,
+    },
+  };
+
+  return {
+    job,
+
+    succeeded:
+      false,
+
+    output:
+      null,
+
+    error,
+
+    segmentationSource:
+      null,
+  };
+}
+
 /* =========================================================
  * Bootstrap class
  * ======================================================= */
@@ -803,52 +868,189 @@ export class BackgroundProcessingBootstrap {
       const queueService =
         getDefaultScanItemQueueService();
 
-      const adapter =
-        createLocalScanItemProcessingAdapter({
-          updateWardrobeItem:
-            options.updateWardrobeItem,
+      const nativeExecutor =
+  createNativeProcessingQueueExecutor({
+    autoInitialize:
+      false,
 
-          inspectFile:
-            options.inspectFile,
+    startImmediately:
+      true,
 
-          cleanupTemporaryFile:
-            options
-              .cleanupTemporaryFile,
+    persistBeforeScheduling:
+      true,
 
-          quality:
-            options
-              .transparentImageQuality ??
-            100,
+    acknowledgeResult:
+      true,
 
-          collectDiagnostics:
-            options
-              .collectSegmentationDiagnostics ??
-            false,
+    enableDebugLogs,
+  });
 
-          reuseSession:
-            options
-              .reuseSegmentationSession ??
-            true,
+const nativeExecutorFunction =
+  nativeExecutor
+    .createExecutorFunction();
 
-          fileNamePrefix:
-            options
-              .processedFileNamePrefix ??
-            'scan-item-queue',
-
-          enableDebugLogs,
-        });
-
-      const executor =
-        createScanItemProcessingExecutor(
-          adapter,
-          {
-            enableDebugLogs,
-          }
-        );
-
-      queueService.setExecutor(
-        executor.getExecutor()
+queueService.setExecutor(
+  async (
+    job,
+    context
+  ) => {
+    const result =
+      await nativeExecutorFunction(
+        job,
+        context
       );
+
+    if (
+      !result.succeeded ||
+      !result.output
+    ) {
+      return result;
+    }
+
+    context
+      .cancellationSignal
+      .throwIfCancelled();
+
+    await context.updateProgress({
+      progress:
+        Math.max(
+          job.progress.progress,
+          0.98
+        ),
+
+      stage:
+        'update-wardrobe-item',
+
+      message:
+        'Updating the wardrobe item.',
+
+      estimatedRemainingMs:
+        0,
+    });
+
+    try {
+      const wardrobeUpdateResult =
+        await options
+          .updateWardrobeItem({
+            wardrobeItemId:
+              job.wardrobeItemId,
+
+            originalImageUri:
+              job.source.uri,
+
+            processedImageUri:
+              result.output
+                .processedImageUri,
+
+            width:
+              result.output.width,
+
+            height:
+              result.output.height,
+
+            category:
+              job.wardrobe
+                .category,
+
+            subcategory:
+              job.wardrobe
+                .subcategory,
+
+            wardrobeType:
+              job.wardrobe
+                .wardrobeType,
+
+            metadata: {
+              ...job.metadata,
+
+              queueJobId:
+                job.id,
+
+              queueId:
+                job.queueId,
+
+              batchId:
+                job.batchId,
+
+              requestId:
+                job.requestId,
+
+              nativeProcessing:
+                true,
+
+              nativeRuntime:
+                typeof result
+                  .output
+                  .metadata
+                  .nativeRuntime ===
+                  'string'
+                  ? result
+                      .output
+                      .metadata
+                      .nativeRuntime
+                  : null,
+            },
+          });
+
+      const updated =
+        typeof wardrobeUpdateResult ===
+          'object' &&
+        wardrobeUpdateResult !==
+          null
+          ? wardrobeUpdateResult
+              .updated
+          : wardrobeUpdateResult !==
+              false;
+
+      if (
+        !updated
+      ) {
+        return createWardrobeUpdateFailureResult(
+          job,
+          'The wardrobe item update was not confirmed.',
+          result.output
+            .processedImageUri
+        );
+      }
+
+      return {
+        ...result,
+
+        output: {
+          ...result.output,
+
+          metadata: {
+            ...result.output
+              .metadata,
+
+            wardrobeUpdated:
+              true,
+
+            ...(
+              typeof wardrobeUpdateResult ===
+                'object' &&
+              wardrobeUpdateResult !==
+                null
+                ? wardrobeUpdateResult
+                    .metadata ??
+                  {}
+                : {}
+            ),
+          },
+        },
+      };
+    } catch (error) {
+      return createWardrobeUpdateFailureResult(
+        job,
+        `Could not update the wardrobe item: ${getUnknownErrorMessage(
+          error
+        )}`,
+        result.output
+          .processedImageUri
+      );
+    }
+  }
+);
 
       const registry =
         getDefaultBackgroundProcessingRegistry();
@@ -953,22 +1155,21 @@ export class BackgroundProcessingBootstrap {
         });
 
       this.runtime = {
-        queueService,
+  queueService,
 
-        adapter,
+  executor:
+    nativeExecutor,
 
-        executor,
+  registry,
 
-        registry,
+  iosDriver,
 
-        iosDriver,
+  androidDriver,
 
-        androidDriver,
+  backgroundService,
 
-        backgroundService,
-
-        lifecycle,
-      };
+  lifecycle,
+};
 
       const queueResult =
         await queueService.initialize(
@@ -1311,17 +1512,11 @@ export class BackgroundProcessingBootstrap {
       .queueService;
   }
 
-  public getAdapter():
-    LocalScanItemProcessingAdapter {
-    return this.requireRuntime()
-      .adapter;
-  }
-
   public getExecutor():
-    ScanItemProcessingExecutor {
-    return this.requireRuntime()
-      .executor;
-  }
+  NativeProcessingQueueExecutor {
+  return this.requireRuntime()
+    .executor;
+}
 
   public getRegistry():
     BackgroundProcessingRegistry {
@@ -1698,12 +1893,6 @@ export class BackgroundProcessingBootstrap {
               .getDiagnostics()
           : null,
 
-      adapter:
-        runtime
-          ? runtime.adapter
-              .getDiagnostics()
-          : null,
-
       executor:
         runtime
           ? runtime.executor
@@ -1834,6 +2023,13 @@ export class BackgroundProcessingBootstrap {
   } catch {
     // لا نوقف التنظيف إذا فشل Lifecycle.
   }
+
+  try {
+  await runtime.executor
+    .dispose();
+} catch {
+  // لا نوقف التنظيف إذا فشل Native Executor.
+}
 
   try {
     await runtime.queueService

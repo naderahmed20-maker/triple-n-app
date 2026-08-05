@@ -952,6 +952,11 @@ function RootNavigationStack() {
  * ======================================================= */
 
 export default function RootLayout() {
+  console.log(
+    'STARTUP: RootLayout render',
+    Date.now()
+  );
+
   const segments =
     useSegments();
 
@@ -1063,9 +1068,12 @@ export default function RootLayout() {
     );
 
   useEffect(() => {
+    console.log('STARTUP: device check effect started', Date.now());
     void runDeviceCheck(
       false
-    );
+    ).then(() => {
+      console.log('STARTUP: device check completed', Date.now());
+    });
   }, [
     runDeviceCheck,
   ]);
@@ -1144,6 +1152,7 @@ export default function RootLayout() {
 
     async function loadSession():
       Promise<void> {
+      console.log('STARTUP: session load started', Date.now());
       try {
         const {
           data,
@@ -1189,6 +1198,7 @@ export default function RootLayout() {
           active &&
           mountedRef.current
         ) {
+          console.log('STARTUP: session load finished', Date.now());
           setSessionReady(
             true
           );
@@ -1299,6 +1309,7 @@ export default function RootLayout() {
 
     async function initializeBackgroundProcessingSystem():
       Promise<void> {
+      console.log('STARTUP: background initialization started', Date.now());
       if (
         backgroundProcessingInitializedRef
           .current
@@ -1319,6 +1330,8 @@ export default function RootLayout() {
       const initializationPromise =
         (
           async () => {
+            console.log('STARTUP: importing background modules', Date.now());
+
             const [
               backgroundModule,
               wardrobeModule,
@@ -1339,6 +1352,9 @@ export default function RootLayout() {
             ) {
               return;
             }
+
+            console.log('STARTUP: background modules imported', Date.now());
+            console.log('STARTUP: scan background init started', Date.now());
 
             await backgroundModule
               .initializeScanItemBackgroundProcessing({
@@ -1412,11 +1428,11 @@ export default function RootLayout() {
                 processedFileNamePrefix:
                   'scan-item-queue',
 
-                autoStartQueue:
-                  false,
+               autoStartQueue:
+  true,
 
-                autoStartBackgroundProcessing:
-                  false,
+autoStartBackgroundProcessing:
+  true,
 
                 enableDebugLogs:
                   __DEV__,
@@ -1428,6 +1444,9 @@ export default function RootLayout() {
             ) {
               return;
             }
+
+            console.log('STARTUP: scan background init finished', Date.now());
+            console.log('STARTUP: notifications init started', Date.now());
 
             await backgroundModule
               .initializeBackgroundProcessingNotifications({
@@ -1506,6 +1525,7 @@ export default function RootLayout() {
               active &&
               mountedRef.current
             ) {
+              console.log('STARTUP: notifications init finished', Date.now());
               backgroundProcessingInitializedRef
                 .current =
                 true;

@@ -27,8 +27,8 @@
         ],
 
         "BGTaskSchedulerPermittedIdentifiers": [
-          "com.naderahmed22.triplen.scan-processing"
-        ]
+                  "com.naderahmed22.triplen.scan-processing"
+         ]
       }
     },
 

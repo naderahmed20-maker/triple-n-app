@@ -1,4 +1,4 @@
-require 'json'
+﻿require 'json'
 
 package = JSON.parse(
   File.read(
@@ -11,9 +11,14 @@ package = JSON.parse(
 )
 
 Pod::Spec.new do |s|
-  s.name = 'TripleNBackground'
-  s.module_name = 'TripleNBackground'
-  s.version = package['version']
+  s.name =
+    'TripleNBackground'
+
+  s.module_name =
+    'TripleNBackground'
+
+  s.version =
+    package['version']
 
   s.summary =
     package['description'] ||
@@ -23,25 +28,61 @@ Pod::Spec.new do |s|
     package['description'] ||
     'Triple N native iOS background processing module'
 
-  s.license = package['license'] || 'MIT'
-  s.author = 'Triple N'
-  s.homepage = 'https://triplen.app'
+  s.license =
+    package['license'] ||
+    'MIT'
 
-  s.platform = :ios, '15.1'
+  s.author =
+    'Triple N'
+
+  s.homepage =
+    'https://triplen.app'
+
+  s.platform =
+    :ios,
+    '15.1'
 
   s.source = {
     :path => '.'
   }
 
-  s.static_framework = true
-  s.swift_version = '5.9'
+  s.static_framework =
+    true
+
+  s.swift_version =
+    '5.9'
 
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES'
   }
 
   s.source_files =
-  '*.{h,m,mm,swift}'
+    '**/*.{h,m,mm,swift}'
 
-  s.dependency 'ExpoModulesCore'
+  s.resources = [
+    'models/**/*.onnx',
+    'models/**/*.ort'
+  ]
+
+  # Secondary EdgeSAM pipeline is not part of production.
+  s.exclude_files = [
+    'EdgeSamNativeTypes.swift',
+    'EdgeSamNativePreprocessor.swift',
+    'EdgeSamNativeSessionManager.swift',
+    'EdgeSamNativeEncoder.swift',
+    'EdgeSamNativePromptBuilder.swift',
+    'EdgeSamNativeDecoder.swift',
+    'EdgeSamNativeCandidateSelector.swift',
+    'EdgeSamNativeMaskRestorer.swift',
+    'EdgeSamNativeMaskRefiner.swift',
+    'EdgeSamNativeBackgroundUnderstanding.swift',
+    'NativeTransparentImageExporter.swift'
+  ]
+
+  s.dependency \
+    'ExpoModulesCore'
+
+  s.dependency \
+    'onnxruntime-objc',
+    '1.24.3'
 end

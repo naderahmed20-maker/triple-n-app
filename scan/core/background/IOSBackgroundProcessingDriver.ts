@@ -1275,6 +1275,21 @@ private lastSentMessage:
         this.callbacks =
           null;
 
+          this.activeNativeTaskId =
+  null;
+
+this.activeNativeJobId =
+  null;
+
+this.lastSentProgress =
+  -1;
+
+this.lastSentStage =
+  null;
+
+this.lastSentMessage =
+  null;
+
         this.updateDiagnostics({
           running:
             false,
@@ -1323,12 +1338,21 @@ private lastSentMessage:
         nativeTaskId;
 
       this.activeNativeJobId =
-        result.nativeJobId ??
-        payload.activeJobId ??
-        null;
+  result.nativeJobId ??
+  payload.activeJobId ??
+  null;
 
-      this.running =
-        true;
+this.lastSentProgress =
+  -1;
+
+this.lastSentStage =
+  null;
+
+this.lastSentMessage =
+  null;
+
+this.running =
+  true;
 
       this.updateDiagnostics({
         running:
@@ -1385,6 +1409,21 @@ private lastSentMessage:
 
       this.callbacks =
         null;
+
+        this.activeNativeTaskId =
+  null;
+
+this.activeNativeJobId =
+  null;
+
+this.lastSentProgress =
+  -1;
+
+this.lastSentStage =
+  null;
+
+this.lastSentMessage =
+  null;
 
       this.updateDiagnostics({
         running:
@@ -1573,6 +1612,15 @@ private lastSentMessage:
 
       this.callbacks =
         null;
+
+        this.lastSentProgress =
+  -1;
+
+this.lastSentStage =
+  null;
+
+this.lastSentMessage =
+  null;
 
       this.updateDiagnostics({
         running:
@@ -1763,6 +1811,15 @@ private handleExpirationEvent(
 
   this.callbacks =
     null;
+
+    this.lastSentProgress =
+  -1;
+
+this.lastSentStage =
+  null;
+
+this.lastSentMessage =
+  null;
 
   this.updateDiagnostics({
     running:
