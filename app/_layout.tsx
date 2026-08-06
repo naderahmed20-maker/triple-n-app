@@ -873,6 +873,14 @@ function RootNavigationStack() {
         />
 
         <Stack.Screen
+  name="report-problem"
+  options={{
+    headerShown:
+      false,
+  }}
+/>
+
+        <Stack.Screen
           name="about"
         />
 
@@ -1295,18 +1303,23 @@ useEffect(() => {
       (
         async () => {
           const [
-            processingModule,
-            wardrobeModule,
-          ] =
-            await Promise.all([
-              import(
-                '@/scan/core/background'
-              ),
+  processingModule,
+  wardrobeModule,
+  storageModule,
+] =
+  await Promise.all([
+    import(
+      '@/scan/core/background'
+    ),
 
-              import(
-                '@/lib/wardrobeService'
-              ),
-            ]);
+    import(
+      '@/lib/wardrobeService'
+    ),
+
+    import(
+      '@/lib/storageService'
+    ),
+  ]);
 
           if (
             !active ||
@@ -1317,63 +1330,106 @@ useEffect(() => {
 
           await processingModule
             .initializeScanItemBackgroundProcessing({
-              updateWardrobeItem:
-                async input => {
-                  await wardrobeModule
-                    .updateWardrobeItem(
-                      input
-                        .wardrobeItemId,
-                      {
-                        image:
-                          input
-                            .processedImageUri,
+             updateWardrobeItem:
+  async input => {
+    const user =
+      await wardrobeModule
+        .getCurrentUser();
 
-                        original_image_path:
-                          input
-                            .originalImageUri,
+    if (
+      !user
+    ) {
+      throw new Error(
+        'The authenticated user is unavailable while saving the processed image.'
+      );
+    }
 
-                        cleaned_image_path:
-                          input
-                            .processedImageUri,
+    /*
+     * processedImageUri هنا file:// محلي.
+     *
+     * نرفعه أولًا إلى Supabase Storage،
+     * ثم نحفظ الرابط الدائم فقط في قاعدة البيانات.
+     */
+    const uploadedProcessedImage =
+      await storageModule
+        .uploadWardrobeImage(
+          input
+            .processedImageUri,
+          user.id
+        );
 
-                        processing_status:
-                          'ready',
+    if (
+      !uploadedProcessedImage ||
+      !uploadedProcessedImage
+        .trim()
+    ) {
+      throw new Error(
+        'The processed wardrobe image upload returned an empty URL.'
+      );
+    }
 
-                        processing_error:
-                          null,
+    await wardrobeModule
+      .updateWardrobeItem(
+        input
+          .wardrobeItemId,
+        {
+          image:
+            uploadedProcessedImage,
 
-                        processing_finished_at:
-                          new Date()
-                            .toISOString(),
-                      }
-                    );
+          /*
+           * لا نحفظ originalImageUri لأنها أيضًا
+           * file:// محلية وقد تختفي بعد Build جديد.
+           *
+           * نحتفظ بالرابط الدائم الناتج حتى لا تصبح
+           * القطعة فارغة بعد إعادة تثبيت التطبيق.
+           */
+          original_image_path:
+            uploadedProcessedImage,
 
-                  return {
-                    updated:
-                      true,
+          cleaned_image_path:
+            uploadedProcessedImage,
 
-                    metadata: {
-                      processedLocally:
-                        true,
+          processing_status:
+            'ready',
 
-                      width:
-                        input.width,
+          processing_error:
+            null,
 
-                      height:
-                        input.height,
+          processing_finished_at:
+            new Date()
+              .toISOString(),
+        }
+      );
 
-                      category:
-                        input.category,
+    return {
+      updated:
+        true,
 
-                      subcategory:
-                        input.subcategory,
+      metadata: {
+        processedLocally:
+          true,
 
-                      wardrobeType:
-                        input
-                          .wardrobeType,
-                    },
-                  };
-                },
+        uploadedRemotely:
+          true,
+
+        width:
+          input.width,
+
+        height:
+          input.height,
+
+        category:
+          input.category,
+
+        subcategory:
+          input.subcategory,
+
+        wardrobeType:
+          input
+            .wardrobeType,
+      },
+    };
+  },
 
               transparentImageQuality:
                 100,

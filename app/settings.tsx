@@ -903,6 +903,13 @@ export default function SettingsScreen() {
     }
   }
 
+  function openProblemReport():
+    void {
+    router.push(
+      '/report-problem' as never
+    );
+  }
+
   function resetAppData() {
     Alert.alert(
       t(
@@ -1082,7 +1089,7 @@ export default function SettingsScreen() {
             }
           />
 
-          <SettingRow
+<SettingRow
             icon="globe"
             title={t(
               'settings.language'
@@ -1098,6 +1105,75 @@ export default function SettingsScreen() {
             }
           />
         </View>
+
+        <TouchableOpacity
+          style={
+            styles.problemReportCard
+          }
+          onPress={
+            openProblemReport
+          }
+          activeOpacity={
+            0.86
+          }
+          accessibilityRole="button"
+          accessibilityLabel={t(
+            'settings.reportProblem' as never
+          )}
+          accessibilityHint={t(
+            'settings.reportProblemSubtitle' as never
+          )}
+        >
+          <View
+            style={
+              styles.problemReportIcon
+            }
+          >
+            <Feather
+              name="message-circle"
+              size={24}
+              color="#111111"
+            />
+          </View>
+
+          <View
+            style={
+              styles.problemReportTextBox
+            }
+          >
+            <Text
+              style={
+                styles.problemReportTitle
+              }
+            >
+              {t(
+                'settings.reportProblem' as never
+              )}
+            </Text>
+
+            <Text
+              style={
+                styles.problemReportSubtitle
+              }
+            >
+              {t(
+                'settings.reportProblemSubtitle' as never
+              )}
+            </Text>
+          </View>
+
+          <View
+            style={
+              styles.problemReportArrow
+            }
+          >
+            <Feather
+              name="chevron-right"
+              size={22}
+              color="#f1d8c2"
+            />
+          </View>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={[
@@ -1653,6 +1729,126 @@ const styles =
 
     segmentTextActive: {
       color: '#111',
+    },
+
+    problemReportCard: {
+      minHeight:
+        94,
+
+      marginTop:
+        22,
+
+      paddingHorizontal:
+        18,
+
+      paddingVertical:
+        16,
+
+      flexDirection:
+        'row',
+
+      alignItems:
+        'center',
+
+      borderWidth:
+        1,
+
+      borderColor:
+        'rgba(241, 216, 194, 0.28)',
+
+      borderRadius:
+        24,
+
+      backgroundColor:
+        '#15171c',
+    },
+
+    problemReportIcon: {
+      width:
+        50,
+
+      height:
+        50,
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+
+      borderRadius:
+        25,
+
+      backgroundColor:
+        '#f1d8c2',
+    },
+
+    problemReportTextBox: {
+      flex:
+        1,
+
+      marginLeft:
+        15,
+
+      paddingRight:
+        10,
+    },
+
+    problemReportTitle: {
+      color:
+        '#ffffff',
+
+      fontSize:
+        16,
+
+      lineHeight:
+        22,
+
+      fontWeight:
+        '900',
+    },
+
+    problemReportSubtitle: {
+      marginTop:
+        5,
+
+      color:
+        '#8f9299',
+
+      fontSize:
+        12,
+
+      lineHeight:
+        18,
+
+      fontWeight:
+        '600',
+    },
+
+    problemReportArrow: {
+      width:
+        34,
+
+      height:
+        34,
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+
+      borderWidth:
+        1,
+
+      borderColor:
+        '#30333a',
+
+      borderRadius:
+        17,
+
+      backgroundColor:
+        '#1d2026',
     },
 
     saveButton: {

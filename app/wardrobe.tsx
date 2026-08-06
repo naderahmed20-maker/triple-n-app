@@ -32,6 +32,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
@@ -100,6 +101,16 @@ const HIDDEN_SUMMER_CATEGORIES =
     'Jacket',
     'Jackets',
   ]);
+
+  /**
+ * لا نظهر رسالة اكتمال الدولاب إلا عند نجاح
+ * معالجة أكثر من أربع صور في جلسة واحدة.
+ */
+const MINIMUM_COMPLETED_ITEMS_FOR_READY_MESSAGE =
+  5;
+
+const WARDROBE_READY_MESSAGE =
+  'Congratulations! Your wardrobe is ready.';
 
 /* =========================================================
  * Helpers
@@ -468,6 +479,38 @@ export default function WardrobeScreen() {
       'male'
     );
 
+    const [
+    wardrobeReadyMessageVisible,
+    setWardrobeReadyMessageVisible,
+  ] =
+    useState(
+      false
+    );
+
+  /**
+   * نسجل فقط الـJobs التي شاهدناها وهي معلقة
+   * في جلسة المعالجة الحالية.
+   *
+   * هذا يمنع ظهور رسالة التهنئة عند فتح التطبيق
+   * بسبب Jobs قديمة مكتملة ومحفوظة في الـQueue.
+   */
+  const observedProcessingJobIdsRef =
+    useRef<
+      Set<string>
+    >(
+      new Set()
+    );
+
+  const processingSessionObservedRef =
+    useRef(
+      false
+    );
+
+  const completionMessageShownRef =
+    useRef(
+      false
+    );
+
   /* =======================================================
    * Categories
    * ===================================================== */
@@ -815,6 +858,140 @@ export default function WardrobeScreen() {
     };
   }, [
     hasPendingItems,
+  ]);
+
+  /* =======================================================
+   * Processing completion message
+   * ===================================================== */
+
+  useEffect(() => {
+    if (
+      !queueSnapshot
+    ) {
+      return;
+    }
+
+    const pendingJobs =
+      queueSnapshot.jobs.filter(
+        job =>
+          isQueueJobPending(
+            job
+          )
+      );
+
+    if (
+      pendingJobs.length >
+      0
+    ) {
+      /**
+       * بداية جلسة جديدة بعد انتهاء الجلسة السابقة.
+       */
+      if (
+        !processingSessionObservedRef
+          .current
+      ) {
+        observedProcessingJobIdsRef
+          .current
+          .clear();
+
+        completionMessageShownRef
+          .current =
+          false;
+      }
+
+      processingSessionObservedRef
+        .current =
+        true;
+
+      for (
+        const job of
+          pendingJobs
+      ) {
+        observedProcessingJobIdsRef
+          .current
+          .add(
+            job.id
+          );
+      }
+
+      return;
+    }
+
+    /**
+     * لا نعرض رسالة بناءً على Jobs قديمة كانت
+     * مكتملة بالفعل عند فتح شاشة الدولاب.
+     */
+    if (
+      !processingSessionObservedRef
+        .current
+    ) {
+      return;
+    }
+
+const observedJobs =
+  queueSnapshot.jobs.filter(
+    job =>
+      observedProcessingJobIdsRef
+        .current
+        .has(
+          job.id
+        )
+  );
+
+const observedItemCount =
+  observedProcessingJobIdsRef
+    .current
+    .size;
+
+const completedObservedItemCount =
+  observedJobs.filter(
+    job =>
+      isQueueJobCompleted(
+        job
+      )
+  ).length;
+
+const failedObservedItemCount =
+  observedJobs.filter(
+    job =>
+      isQueueJobFailed(
+        job
+      )
+  ).length;
+
+const allObservedItemsCompleted =
+  observedItemCount >
+    0 &&
+  completedObservedItemCount ===
+    observedItemCount;
+
+if (
+  observedItemCount >=
+    MINIMUM_COMPLETED_ITEMS_FOR_READY_MESSAGE &&
+  allObservedItemsCompleted &&
+  failedObservedItemCount ===
+    0 &&
+  !completionMessageShownRef
+    .current
+) {
+  completionMessageShownRef
+    .current =
+    true;
+
+  setWardrobeReadyMessageVisible(
+    true
+  );
+}
+
+    processingSessionObservedRef
+      .current =
+      false;
+
+    observedProcessingJobIdsRef
+      .current
+      .clear();
+  }, [
+    queueSnapshot,
   ]);
 
   /* =======================================================
@@ -1300,48 +1477,41 @@ export default function WardrobeScreen() {
    * ===================================================== */
 
   const processingJobs =
-  queueSnapshot
-    ?.jobs
-    .filter(
-      job =>
-        job.status ===
-          'queued' ||
-        job.status ===
-          'preparing' ||
-        job.status ===
-          'processing' ||
-        job.status ===
-          'retry-scheduled' ||
-        job.status ===
-          'interrupted'
-    ) ??
-  [];
+    queueSnapshot
+      ?.jobs
+      .filter(
+        job =>
+          isQueueJobPending(
+            job
+          )
+      ) ??
+    [];
 
-const remainingProcessingItemCount =
-  processingJobs.length;
+  const remainingProcessingItemCount =
+    processingJobs.length;
 
-const estimatedRemainingMs =
-  queueSnapshot
-    ?.timing
-    .estimatedRemainingMs ??
-  queueSnapshot
-    ?.statistics
-    .estimatedRemainingMs ??
-  null;
+  const estimatedRemainingMs =
+    queueSnapshot
+      ?.timing
+      .estimatedRemainingMs ??
+    queueSnapshot
+      ?.statistics
+      .estimatedRemainingMs ??
+    null;
 
-const estimatedRemainingMinutes =
-  estimatedRemainingMs !==
-    null &&
-  estimatedRemainingMs >
-    0
-    ? Math.max(
-        1,
-        Math.ceil(
-          estimatedRemainingMs /
-            60000
+  const estimatedRemainingMinutes =
+    estimatedRemainingMs !==
+      null &&
+    estimatedRemainingMs >
+      0
+      ? Math.max(
+          1,
+          Math.ceil(
+            estimatedRemainingMs /
+              60000
+          )
         )
-      )
-    : null;
+      : null;
 
   return (
     <ImageBackground
@@ -1443,87 +1613,48 @@ const estimatedRemainingMinutes =
                 </View>
               </View>
 
-              {remainingProcessingItemCount >
-0 ? (
-  <View
-    style={{
-      marginHorizontal:
-        16,
+{remainingProcessingItemCount >
+              0 ? (
+                <View
+                  style={
+                    styles.processingSummary
+                  }
+                >
+                  <Text
+                    style={
+                      styles.processingSummaryTitle
+                    }
+                  >
+                    {estimatedRemainingMinutes !==
+                    null
+                      ? `Processing ${remainingProcessingItemCount} ${
+                          remainingProcessingItemCount ===
+                          1
+                            ? 'item'
+                            : 'items'
+                        } · About ${estimatedRemainingMinutes} ${
+                          estimatedRemainingMinutes ===
+                          1
+                            ? 'minute'
+                            : 'minutes'
+                        } remaining`
+                      : `Processing ${remainingProcessingItemCount} ${
+                          remainingProcessingItemCount ===
+                          1
+                            ? 'item'
+                            : 'items'
+                        }`}
+                  </Text>
 
-      marginTop:
-        12,
-
-      marginBottom:
-        10,
-
-      paddingHorizontal:
-        14,
-
-      paddingVertical:
-        12,
-
-      borderRadius:
-        14,
-
-      backgroundColor:
-        'rgba(0, 0, 0, 0.72)',
-    }}
-  >
-    <Text
-      style={{
-        color:
-          '#FFFFFF',
-
-        fontSize:
-          15,
-
-        fontWeight:
-          '700',
-
-        textAlign:
-          'center',
-      }}
-    >
-      {estimatedRemainingMinutes !==
-      null
-        ? `Processing ${remainingProcessingItemCount} ${
-            remainingProcessingItemCount ===
-            1
-              ? 'item'
-              : 'items'
-          } · About ${estimatedRemainingMinutes} ${
-            estimatedRemainingMinutes ===
-            1
-              ? 'minute'
-              : 'minutes'
-          } remaining`
-        : `Processing ${remainingProcessingItemCount} ${
-            remainingProcessingItemCount ===
-            1
-              ? 'item'
-              : 'items'
-          }`}
-    </Text>
-
-    <Text
-      style={{
-        color:
-          'rgba(255, 255, 255, 0.78)',
-
-        fontSize:
-          12,
-
-        marginTop:
-          4,
-
-        textAlign:
-          'center',
-      }}
-    >
-      You can leave the app running in the background.
-    </Text>
-  </View>
-) : null}
+                  <Text
+                    style={
+                      styles.processingPatienceText
+                    }
+                  >
+                    Thank you for your patience.
+                  </Text>
+                </View>
+              ) : null}
 
               <TextInput
                 style={
@@ -1888,6 +2019,83 @@ const estimatedRemainingMinutes =
             ) : null}
           </TouchableOpacity>
         </Modal>
+        <Modal
+          visible={
+            wardrobeReadyMessageVisible
+          }
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() =>
+            setWardrobeReadyMessageVisible(
+              false
+            )
+          }
+        >
+          <View
+            style={
+              styles.wardrobeReadyBackdrop
+            }
+          >
+            <View
+              style={
+                styles.wardrobeReadyCard
+              }
+            >
+              <View
+                style={
+                  styles.wardrobeReadyIcon
+                }
+              >
+                <Text
+                  style={
+                    styles.wardrobeReadyIconText
+                  }
+                >
+                  ✓
+                </Text>
+              </View>
+
+              <Text
+                style={
+                  styles.wardrobeReadyTitle
+                }
+              >
+                {WARDROBE_READY_MESSAGE}
+              </Text>
+
+              <Text
+                style={
+                  styles.wardrobeReadyDescription
+                }
+              >
+                Your newly processed items are now ready to use.
+              </Text>
+
+              <TouchableOpacity
+                activeOpacity={
+                  0.85
+                }
+                style={
+                  styles.wardrobeReadyButton
+                }
+                onPress={() =>
+                  setWardrobeReadyMessageVisible(
+                    false
+                  )
+                }
+              >
+                <Text
+                  style={
+                    styles.wardrobeReadyButtonText
+                  }
+                >
+                  Explore my wardrobe
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </View>
     </ImageBackground>
   );
@@ -2008,6 +2216,72 @@ const styles =
 
       marginTop:
         4,
+    },
+
+    processingSummary: {
+      marginHorizontal:
+        16,
+
+      marginTop:
+        12,
+
+      marginBottom:
+        10,
+
+      paddingHorizontal:
+        16,
+
+      paddingVertical:
+        14,
+
+      borderWidth:
+        1,
+
+      borderColor:
+        'rgba(244, 223, 200, 0.2)',
+
+      borderRadius:
+        16,
+
+      backgroundColor:
+        'rgba(0, 0, 0, 0.72)',
+    },
+
+    processingSummaryTitle: {
+      color:
+        '#FFFFFF',
+
+      fontSize:
+        15,
+
+      lineHeight:
+        21,
+
+      fontWeight:
+        '700',
+
+      textAlign:
+        'center',
+    },
+
+    processingPatienceText: {
+      marginTop:
+        6,
+
+      color:
+        'rgba(244, 223, 200, 0.82)',
+
+      fontSize:
+        12,
+
+      lineHeight:
+        17,
+
+      fontWeight:
+        '500',
+
+      textAlign:
+        'center',
     },
 
     searchInput: {
@@ -2487,5 +2761,171 @@ const styles =
 
       resizeMode:
         'contain',
+    },
+
+    wardrobeReadyBackdrop: {
+      flex:
+        1,
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+
+      paddingHorizontal:
+        24,
+
+      backgroundColor:
+        'rgba(0, 0, 0, 0.82)',
+    },
+
+    wardrobeReadyCard: {
+      width:
+        '100%',
+
+      maxWidth:
+        380,
+
+      alignItems:
+        'center',
+
+      paddingHorizontal:
+        25,
+
+      paddingTop:
+        30,
+
+      paddingBottom:
+        24,
+
+      borderWidth:
+        1,
+
+      borderColor:
+        'rgba(244, 223, 200, 0.32)',
+
+      borderRadius:
+        28,
+
+      backgroundColor:
+        '#121317',
+    },
+
+    wardrobeReadyIcon: {
+      width:
+        68,
+
+      height:
+        68,
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+
+      borderWidth:
+        1,
+
+      borderColor:
+        'rgba(244, 223, 200, 0.55)',
+
+      borderRadius:
+        34,
+
+      backgroundColor:
+        'rgba(244, 223, 200, 0.1)',
+    },
+
+    wardrobeReadyIconText: {
+      color:
+        '#f4dfc8',
+
+      fontSize:
+        34,
+
+      lineHeight:
+        40,
+
+      fontWeight:
+        '700',
+    },
+
+    wardrobeReadyTitle: {
+      marginTop:
+        22,
+
+      color:
+        '#FFFFFF',
+
+      fontSize:
+        24,
+
+      lineHeight:
+        31,
+
+      fontWeight:
+        '900',
+
+      textAlign:
+        'center',
+    },
+
+    wardrobeReadyDescription: {
+      marginTop:
+        10,
+
+      color:
+        '#a9abb2',
+
+      fontSize:
+        14,
+
+      lineHeight:
+        21,
+
+      textAlign:
+        'center',
+    },
+
+    wardrobeReadyButton: {
+      width:
+        '100%',
+
+      minHeight:
+        52,
+
+      marginTop:
+        24,
+
+      alignItems:
+        'center',
+
+      justifyContent:
+        'center',
+
+      paddingHorizontal:
+        20,
+
+      borderRadius:
+        18,
+
+      backgroundColor:
+        '#f4dfc8',
+    },
+
+    wardrobeReadyButtonText: {
+      color:
+        '#111111',
+
+      fontSize:
+        15,
+
+      fontWeight:
+        '900',
+
+      textAlign:
+        'center',
     },
   });

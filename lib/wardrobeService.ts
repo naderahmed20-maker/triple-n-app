@@ -390,6 +390,28 @@ export async function getMyWardrobeItems() {
     throw error;
   }
 
+  console.log(
+  'WARDROBE DATABASE IMAGES:',
+  (data || []).map(
+    item => ({
+      id:
+        item.id,
+
+      image:
+        item.image,
+
+      original_image_path:
+        item.original_image_path,
+
+      cleaned_image_path:
+        item.cleaned_image_path,
+
+      processing_status:
+        item.processing_status,
+    })
+  )
+);
+
   return (
     data ||
     []
