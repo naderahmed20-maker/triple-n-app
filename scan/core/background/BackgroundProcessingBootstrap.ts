@@ -3,26 +3,26 @@
 //
 // Triple N - Background Processing Bootstrap
 //
-// هذا الملف هو نقطة التشغيل المركزية لنظام
-// Scan Item Processing Queue بالكامل.
+// ┘çÏ░Ïº Ïº┘ä┘à┘ä┘ü ┘ç┘ê ┘å┘éÏÀÏ® Ïº┘äÏ¬Ï┤Ï║┘è┘ä Ïº┘ä┘àÏ▒┘âÏ▓┘èÏ® ┘ä┘åÏ©Ïº┘à
+// Scan Item Processing Queue Ï¿Ïº┘ä┘âÏº┘à┘ä.
 //
-// مسؤولياته:
+// ┘àÏ│Ïñ┘ê┘ä┘èÏºÏ¬┘ç:
 //
-// 1) إنشاء LocalScanItemProcessingAdapter.
-// 2) إنشاء ScanItemProcessingExecutor.
-// 3) تسجيل Executor داخل ScanItemQueueService.
-// 4) إنشاء وتسجيل iOS Background Driver.
-// 5) إنشاء وتسجيل Android Background Driver.
-// 6) إنشاء BackgroundProcessingService.
-// 7) إنشاء BackgroundProcessingAppLifecycle.
-// 8) تهيئة Queue واستعادة الصور السابقة.
-// 9) ربط Queue وNative Background Processing بدورة حياة التطبيق.
-// 10) بدء المعالجة تلقائيًا عند وجود Jobs معلقة.
-// 11) منع تهيئة النظام أكثر من مرة.
-// 12) توفير Snapshot وتشخيصات موحدة.
-// 13) تنظيف كل الخدمات بالترتيب الصحيح.
+// 1) ÏÑ┘åÏ┤ÏºÏí LocalScanItemProcessingAdapter.
+// 2) ÏÑ┘åÏ┤ÏºÏí ScanItemProcessingExecutor.
+// 3) Ï¬Ï│Ï¼┘è┘ä Executor Ï»ÏºÏ«┘ä ScanItemQueueService.
+// 4) ÏÑ┘åÏ┤ÏºÏí ┘êÏ¬Ï│Ï¼┘è┘ä iOS Background Driver.
+// 5) ÏÑ┘åÏ┤ÏºÏí ┘êÏ¬Ï│Ï¼┘è┘ä Android Background Driver.
+// 6) ÏÑ┘åÏ┤ÏºÏí BackgroundProcessingService.
+// 7) ÏÑ┘åÏ┤ÏºÏí BackgroundProcessingAppLifecycle.
+// 8) Ï¬┘ç┘èÏªÏ® Queue ┘êÏºÏ│Ï¬Ï╣ÏºÏ»Ï® Ïº┘äÏÁ┘êÏ▒ Ïº┘äÏ│ÏºÏ¿┘éÏ®.
+// 9) Ï▒Ï¿ÏÀ Queue ┘êNative Background Processing Ï¿Ï»┘êÏ▒Ï® Ï¡┘èÏºÏ® Ïº┘äÏ¬ÏÀÏ¿┘è┘é.
+// 10) Ï¿Ï»Ïí Ïº┘ä┘àÏ╣Ïº┘äÏ¼Ï® Ï¬┘ä┘éÏºÏª┘è┘ïÏº Ï╣┘åÏ» ┘êÏ¼┘êÏ» Jobs ┘àÏ╣┘ä┘éÏ®.
+// 11) ┘à┘åÏ╣ Ï¬┘ç┘èÏªÏ® Ïº┘ä┘åÏ©Ïº┘à Ïú┘âÏ½Ï▒ ┘à┘å ┘àÏ▒Ï®.
+// 12) Ï¬┘ê┘ü┘èÏ▒ Snapshot ┘êÏ¬Ï┤Ï«┘èÏÁÏºÏ¬ ┘à┘êÏ¡Ï»Ï®.
+// 13) Ï¬┘åÏ©┘è┘ü ┘â┘ä Ïº┘äÏ«Ï»┘àÏºÏ¬ Ï¿Ïº┘äÏ¬Ï▒Ï¬┘èÏ¿ Ïº┘äÏÁÏ¡┘èÏ¡.
 //
-// يجب تمرير دالة updateWardrobeItem الحقيقية عند التهيئة.
+// ┘èÏ¼Ï¿ Ï¬┘àÏ▒┘èÏ▒ Ï»Ïº┘äÏ® updateWardrobeItem Ïº┘äÏ¡┘é┘è┘é┘èÏ® Ï╣┘åÏ» Ïº┘äÏ¬┘ç┘èÏªÏ®.
 
 import {
   Platform,
@@ -30,8 +30,6 @@ import {
 
 import type {
   ProcessingJob,
-  ProcessingJobError,
-  ProcessingJobExecutionResult,
   ProcessingQueueSnapshot,
 } from '../queue/QueueTypes';
 
@@ -39,11 +37,11 @@ import type {
   ProcessingQueueInitializeResult,
 } from '../queue/ProcessingQueue';
 
-import type {
-  LocalScanItemFileInspector,
-  LocalScanItemTemporaryFileCleaner,
-  LocalScanItemWardrobeUpdater,
-} from '../services/LocalScanItemProcessingAdapter';
+import {
+  createScanItemProcessingExecutor,
+  type ScanItemProcessingExecutor,
+  type ScanItemProcessingExecutorDiagnostics,
+} from '../services/ScanItemProcessingExecutor';
 
 import {
   getDefaultScanItemQueueService,
@@ -52,10 +50,13 @@ import {
 } from '../services/ScanItemQueueService';
 
 import {
-  createNativeProcessingQueueExecutor,
-  type NativeProcessingQueueExecutor,
-  type NativeProcessingQueueExecutorDiagnostics,
-} from '../native/NativeProcessingQueueExecutor';
+  createLocalScanItemProcessingAdapter,
+  type LocalScanItemFileInspector,
+  type LocalScanItemProcessingAdapter,
+  type LocalScanItemProcessingAdapterDiagnostics,
+  type LocalScanItemTemporaryFileCleaner,
+  type LocalScanItemWardrobeUpdater,
+} from '../services/LocalScanItemProcessingAdapter';
 
 import type {
   BackgroundProcessingCapabilityResult,
@@ -71,12 +72,6 @@ import {
   type AndroidBackgroundProcessingDriverOptions,
 } from './AndroidBackgroundProcessingDriver';
 
-import {
-  createIOSBackgroundProcessingDriver,
-  type IOSBackgroundProcessingDriver,
-  type IOSBackgroundProcessingDriverDiagnostics,
-  type IOSBackgroundProcessingDriverOptions,
-} from './IOSBackgroundProcessingDriver';
 
 import {
   getDefaultBackgroundProcessingRegistry,
@@ -112,86 +107,86 @@ export type BackgroundProcessingBootstrapState =
 
 export type BackgroundProcessingBootstrapOptions = {
   /**
-   * الدالة الحقيقية المسؤولة عن تحديث
-   * عنصر الدولاب بعد انتهاء المعالجة.
+   * Ïº┘äÏ»Ïº┘äÏ® Ïº┘äÏ¡┘é┘è┘é┘èÏ® Ïº┘ä┘àÏ│Ïñ┘ê┘äÏ® Ï╣┘å Ï¬Ï¡Ï»┘èÏ½
+   * Ï╣┘åÏÁÏ▒ Ïº┘äÏ»┘ê┘äÏºÏ¿ Ï¿Ï╣Ï» Ïº┘åÏ¬┘çÏºÏí Ïº┘ä┘àÏ╣Ïº┘äÏ¼Ï®.
    */
   updateWardrobeItem:
     LocalScanItemWardrobeUpdater;
 
   /**
-   * فحص وجود الملفات اختياري.
+   * ┘üÏ¡ÏÁ ┘êÏ¼┘êÏ» Ïº┘ä┘à┘ä┘üÏºÏ¬ ÏºÏ«Ï¬┘èÏºÏ▒┘è.
    */
   inspectFile?:
     LocalScanItemFileInspector;
 
   /**
-   * حذف الملفات المؤقتة عند فشل Job.
+   * Ï¡Ï░┘ü Ïº┘ä┘à┘ä┘üÏºÏ¬ Ïº┘ä┘àÏñ┘éÏ¬Ï® Ï╣┘åÏ» ┘üÏ┤┘ä Job.
    */
   cleanupTemporaryFile?:
     LocalScanItemTemporaryFileCleaner;
 
   /**
-   * جودة PNG النهائية من 1 إلى 100.
+   * Ï¼┘êÏ»Ï® PNG Ïº┘ä┘å┘çÏºÏª┘èÏ® ┘à┘å 1 ÏÑ┘ä┘ë 100.
    */
   transparentImageQuality?:
     number;
 
   /**
-   * هل نجمع Diagnostics كاملة من EdgeSAM.
+   * ┘ç┘ä ┘åÏ¼┘àÏ╣ Diagnostics ┘âÏº┘à┘äÏ® ┘à┘å EdgeSAM.
    */
   collectSegmentationDiagnostics?:
     boolean;
 
   /**
-   * إعادة استخدام EdgeSAM Embedding.
+   * ÏÑÏ╣ÏºÏ»Ï® ÏºÏ│Ï¬Ï«Ï»Ïº┘à EdgeSAM Embedding.
    */
   reuseSegmentationSession?:
     boolean;
 
   /**
-   * بداية اسم ملف الصورة النهائية.
+   * Ï¿Ï»Ïº┘èÏ® ÏºÏ│┘à ┘à┘ä┘ü Ïº┘äÏÁ┘êÏ▒Ï® Ïº┘ä┘å┘çÏºÏª┘èÏ®.
    */
   processedFileNamePrefix?:
     string;
 
   /**
-   * هل نبدأ Queue تلقائيًا بعد التهيئة
-   * عندما يكون التطبيق في الواجهة.
+   * ┘ç┘ä ┘åÏ¿Ï»Ïú Queue Ï¬┘ä┘éÏºÏª┘è┘ïÏº Ï¿Ï╣Ï» Ïº┘äÏ¬┘ç┘èÏªÏ®
+   * Ï╣┘åÏ»┘àÏº ┘è┘â┘ê┘å Ïº┘äÏ¬ÏÀÏ¿┘è┘é ┘ü┘è Ïº┘ä┘êÏºÏ¼┘çÏ®.
    */
   autoStartQueue?:
     boolean;
 
   /**
-   * هل نبدأ Native Background Processing
-   * تلقائيًا عندما يدخل التطبيق الخلفية.
+   * ┘ç┘ä ┘åÏ¿Ï»Ïú Native Background Processing
+   * Ï¬┘ä┘éÏºÏª┘è┘ïÏº Ï╣┘åÏ»┘àÏº ┘èÏ»Ï«┘ä Ïº┘äÏ¬ÏÀÏ¿┘è┘é Ïº┘äÏ«┘ä┘ü┘èÏ®.
    */
   autoStartBackgroundProcessing?:
     boolean;
 
   /**
-   * إعدادات دورة حياة التطبيق.
+   * ÏÑÏ╣Ï»ÏºÏ»ÏºÏ¬ Ï»┘êÏ▒Ï® Ï¡┘èÏºÏ® Ïº┘äÏ¬ÏÀÏ¿┘è┘é.
    *
-   * القيم الخاصة بـautoStartQueue و
-   * autoStartBackgroundProcessing لها الأولوية
-   * في نقطتي التشغيل الأساسيتين.
+   * Ïº┘ä┘é┘è┘à Ïº┘äÏ«ÏºÏÁÏ® Ï¿┘ÇautoStartQueue ┘ê
+   * autoStartBackgroundProcessing ┘ä┘çÏº Ïº┘äÏú┘ê┘ä┘ê┘èÏ®
+   * ┘ü┘è ┘å┘éÏÀÏ¬┘è Ïº┘äÏ¬Ï┤Ï║┘è┘ä Ïº┘äÏúÏ│ÏºÏ│┘èÏ¬┘è┘å.
    */
   lifecycle?:
     PartialBackgroundProcessingAppLifecycleConfig;
 
   /**
-   * إعدادات iOS Driver.
+   * ÏÑÏ╣Ï»ÏºÏ»ÏºÏ¬ iOS Driver.
    */
   ios?:
-    IOSBackgroundProcessingDriverOptions;
+    unknown;
 
   /**
-   * إعدادات Android Driver.
+   * ÏÑÏ╣Ï»ÏºÏ»ÏºÏ¬ Android Driver.
    */
   android?:
     AndroidBackgroundProcessingDriverOptions;
 
   /**
-   * طباعة Logs أثناء التطوير.
+   * ÏÀÏ¿ÏºÏ╣Ï® Logs ÏúÏ½┘åÏºÏí Ïº┘äÏ¬ÏÀ┘ê┘èÏ▒.
    */
   enableDebugLogs?:
     boolean;
@@ -322,14 +317,17 @@ export type BackgroundProcessingBootstrapDiagnostics = {
   queue:
     ScanItemQueueServiceDiagnostics | null;
 
-    executor:
-  NativeProcessingQueueExecutorDiagnostics | null;
+  adapter:
+    LocalScanItemProcessingAdapterDiagnostics | null;
+
+  executor:
+    ScanItemProcessingExecutorDiagnostics | null;
 
   registry:
     BackgroundProcessingRegistryDiagnostics | null;
 
   iosDriver:
-    IOSBackgroundProcessingDriverDiagnostics | null;
+    null;
 
   androidDriver:
     AndroidBackgroundProcessingDriverDiagnostics | null;
@@ -349,14 +347,14 @@ type BackgroundProcessingRuntime = {
   queueService:
     ScanItemQueueService;
 
-    executor:
-  NativeProcessingQueueExecutor;
+  adapter:
+    LocalScanItemProcessingAdapter;
+
+  executor:
+    ScanItemProcessingExecutor;
 
   registry:
     BackgroundProcessingRegistry;
-
-  iosDriver:
-    IOSBackgroundProcessingDriver;
 
   androidDriver:
     AndroidBackgroundProcessingDriver;
@@ -409,7 +407,7 @@ function getUnknownErrorMessage(
       return serialized;
     }
   } catch {
-    // نستخدم String في النهاية.
+    // ┘åÏ│Ï¬Ï«Ï»┘à String ┘ü┘è Ïº┘ä┘å┘çÏº┘èÏ®.
   }
 
   return String(
@@ -597,78 +595,6 @@ function combineWarnings(
   }
 
   return result;
-}
-
-function createWardrobeUpdateFailureResult(
-  job:
-    ProcessingJob,
-  message:
-    string,
-  processedImageUri:
-    string
-): ProcessingJobExecutionResult {
-  const error:
-    ProcessingJobError = {
-    code:
-      'WARDROBE_ITEM_UPDATE_FAILED',
-
-    message,
-
-    source:
-      'wardrobe',
-
-    retryable:
-      true,
-
-    occurredAt:
-      now(),
-
-    attempt:
-      job.retry.attempt,
-
-    stage:
-      'update-wardrobe-item',
-
-    nativeCode:
-      null,
-
-    segmentationErrorCode:
-      null,
-
-    metadata: {
-      jobId:
-        job.id,
-
-      queueId:
-        job.queueId,
-
-      batchId:
-        job.batchId,
-
-      requestId:
-        job.requestId,
-
-      wardrobeItemId:
-        job.wardrobeItemId,
-
-      processedImageUri,
-    },
-  };
-
-  return {
-    job,
-
-    succeeded:
-      false,
-
-    output:
-      null,
-
-    error,
-
-    segmentationSource:
-      null,
-  };
 }
 
 /* =========================================================
@@ -860,211 +786,67 @@ export class BackgroundProcessingBootstrap {
         options.autoStartQueue ??
         true;
 
-      const autoStartBackgroundProcessing =
-        options
-          .autoStartBackgroundProcessing ??
-        true;
+     const autoStartBackgroundProcessing =
+  Platform.OS ===
+    'android' &&
+  (
+    options
+      .autoStartBackgroundProcessing ??
+    true
+  );
 
       const queueService =
         getDefaultScanItemQueueService();
 
-      const nativeExecutor =
-  createNativeProcessingQueueExecutor({
-    autoInitialize:
-      false,
+      const adapter =
+        createLocalScanItemProcessingAdapter({
+          updateWardrobeItem:
+            options.updateWardrobeItem,
 
-    startImmediately:
-      true,
+          inspectFile:
+            options.inspectFile,
 
-    persistBeforeScheduling:
-      true,
+          cleanupTemporaryFile:
+            options
+              .cleanupTemporaryFile,
 
-    acknowledgeResult:
-      true,
+          quality:
+            options
+              .transparentImageQuality ??
+            100,
 
-    enableDebugLogs,
-  });
+          collectDiagnostics:
+            options
+              .collectSegmentationDiagnostics ??
+            false,
 
-const nativeExecutorFunction =
-  nativeExecutor
-    .createExecutorFunction();
+          reuseSession:
+            options
+              .reuseSegmentationSession ??
+            true,
 
-queueService.setExecutor(
-  async (
-    job,
-    context
-  ) => {
-    const result =
-      await nativeExecutorFunction(
-        job,
-        context
-      );
+          fileNamePrefix:
+            options
+              .processedFileNamePrefix ??
+            'scan-item-queue',
 
-    if (
-      !result.succeeded ||
-      !result.output
-    ) {
-      return result;
-    }
+          enableDebugLogs,
+        });
 
-    context
-      .cancellationSignal
-      .throwIfCancelled();
-
-    await context.updateProgress({
-      progress:
-        Math.max(
-          job.progress.progress,
-          0.98
-        ),
-
-      stage:
-        'update-wardrobe-item',
-
-      message:
-        'Updating the wardrobe item.',
-
-      estimatedRemainingMs:
-        0,
-    });
-
-    try {
-      const wardrobeUpdateResult =
-        await options
-          .updateWardrobeItem({
-            wardrobeItemId:
-              job.wardrobeItemId,
-
-            originalImageUri:
-              job.source.uri,
-
-            processedImageUri:
-              result.output
-                .processedImageUri,
-
-            width:
-              result.output.width,
-
-            height:
-              result.output.height,
-
-            category:
-              job.wardrobe
-                .category,
-
-            subcategory:
-              job.wardrobe
-                .subcategory,
-
-            wardrobeType:
-              job.wardrobe
-                .wardrobeType,
-
-            metadata: {
-              ...job.metadata,
-
-              queueJobId:
-                job.id,
-
-              queueId:
-                job.queueId,
-
-              batchId:
-                job.batchId,
-
-              requestId:
-                job.requestId,
-
-              nativeProcessing:
-                true,
-
-              nativeRuntime:
-                typeof result
-                  .output
-                  .metadata
-                  .nativeRuntime ===
-                  'string'
-                  ? result
-                      .output
-                      .metadata
-                      .nativeRuntime
-                  : null,
-            },
-          });
-
-      const updated =
-        typeof wardrobeUpdateResult ===
-          'object' &&
-        wardrobeUpdateResult !==
-          null
-          ? wardrobeUpdateResult
-              .updated
-          : wardrobeUpdateResult !==
-              false;
-
-      if (
-        !updated
-      ) {
-        return createWardrobeUpdateFailureResult(
-          job,
-          'The wardrobe item update was not confirmed.',
-          result.output
-            .processedImageUri
+      const executor =
+        createScanItemProcessingExecutor(
+          adapter,
+          {
+            enableDebugLogs,
+          }
         );
-      }
 
-      return {
-        ...result,
-
-        output: {
-          ...result.output,
-
-          metadata: {
-            ...result.output
-              .metadata,
-
-            wardrobeUpdated:
-              true,
-
-            ...(
-              typeof wardrobeUpdateResult ===
-                'object' &&
-              wardrobeUpdateResult !==
-                null
-                ? wardrobeUpdateResult
-                    .metadata ??
-                  {}
-                : {}
-            ),
-          },
-        },
-      };
-    } catch (error) {
-      return createWardrobeUpdateFailureResult(
-        job,
-        `Could not update the wardrobe item: ${getUnknownErrorMessage(
-          error
-        )}`,
-        result.output
-          .processedImageUri
+      queueService.setExecutor(
+        executor.getExecutor()
       );
-    }
-  }
-);
 
       const registry =
         getDefaultBackgroundProcessingRegistry();
-
-      const iosDriver =
-        createIOSBackgroundProcessingDriver({
-          ...(options.ios ??
-          {}),
-
-          enableDebugLogs:
-            options.ios
-              ?.enableDebugLogs ??
-            enableDebugLogs,
-        });
 
       const androidDriver =
         createAndroidBackgroundProcessingDriver({
@@ -1076,19 +858,6 @@ queueService.setExecutor(
               ?.enableDebugLogs ??
             enableDebugLogs,
         });
-
-      registry.registerIOS(
-        iosDriver,
-        {
-          replaceExisting:
-            true,
-
-          metadata: {
-            source:
-              'BackgroundProcessingBootstrap',
-          },
-        }
-      );
 
       registry.registerAndroid(
         androidDriver,
@@ -1155,21 +924,20 @@ queueService.setExecutor(
         });
 
       this.runtime = {
-  queueService,
+        queueService,
 
-  executor:
-    nativeExecutor,
+        adapter,
 
-  registry,
+        executor,
 
-  iosDriver,
+        registry,
 
-  androidDriver,
+        androidDriver,
 
-  backgroundService,
+        backgroundService,
 
-  lifecycle,
-};
+        lifecycle,
+      };
 
       const queueResult =
         await queueService.initialize(
@@ -1512,11 +1280,17 @@ queueService.setExecutor(
       .queueService;
   }
 
+  public getAdapter():
+    LocalScanItemProcessingAdapter {
+    return this.requireRuntime()
+      .adapter;
+  }
+
   public getExecutor():
-  NativeProcessingQueueExecutor {
-  return this.requireRuntime()
-    .executor;
-}
+    ScanItemProcessingExecutor {
+    return this.requireRuntime()
+      .executor;
+  }
 
   public getRegistry():
     BackgroundProcessingRegistry {
@@ -1524,11 +1298,10 @@ queueService.setExecutor(
       .registry;
   }
 
-  public getIOSDriver():
-    IOSBackgroundProcessingDriver {
-    return this.requireRuntime()
-      .iosDriver;
-  }
+ public getIOSDriver():
+  null {
+  return null;
+}
 
   public getAndroidDriver():
     AndroidBackgroundProcessingDriver {
@@ -1654,6 +1427,12 @@ queueService.setExecutor(
 
   public async startBackgroundProcessing():
     Promise<boolean> {
+    if (
+  Platform.OS !==
+    'android'
+) {
+  return false;
+}
     const runtime =
       this.requireRuntime();
 
@@ -1712,6 +1491,12 @@ queueService.setExecutor(
         .stopBackgroundProcessing(
           reason
         );
+        if (
+  Platform.OS !==
+    'android'
+) {
+  return false;
+}
 
     this.lastUpdatedAt =
       now();
@@ -1893,6 +1678,12 @@ queueService.setExecutor(
               .getDiagnostics()
           : null,
 
+      adapter:
+        runtime
+          ? runtime.adapter
+              .getDiagnostics()
+          : null,
+
       executor:
         runtime
           ? runtime.executor
@@ -1906,10 +1697,7 @@ queueService.setExecutor(
           : null,
 
       iosDriver:
-        runtime
-          ? runtime.iosDriver
-              .getDiagnostics()
-          : null,
+      null,
 
       androidDriver:
         runtime
@@ -1980,15 +1768,22 @@ queueService.setExecutor(
     );
   }
 
-  public isBackgroundRunning():
-    boolean {
-    return (
-      this.runtime
-        ?.backgroundService
-        .isRunning() ??
-      false
-    );
+ public isBackgroundRunning():
+  boolean {
+  if (
+    Platform.OS !==
+      'android'
+  ) {
+    return false;
   }
+
+  return (
+    this.runtime
+      ?.backgroundService
+      .isRunning() ??
+    false
+  );
+}
 
   public hasPendingJobs():
     boolean {
@@ -2021,28 +1816,21 @@ queueService.setExecutor(
     await runtime.lifecycle
       .dispose();
   } catch {
-    // لا نوقف التنظيف إذا فشل Lifecycle.
+    // ┘äÏº ┘å┘ê┘é┘ü Ïº┘äÏ¬┘åÏ©┘è┘ü ÏÑÏ░Ïº ┘üÏ┤┘ä Lifecycle.
   }
-
-  try {
-  await runtime.executor
-    .dispose();
-} catch {
-  // لا نوقف التنظيف إذا فشل Native Executor.
-}
 
   try {
     await runtime.queueService
       .flush();
   } catch {
-    // لا نوقف التنظيف إذا فشل حفظ Queue.
+    // ┘äÏº ┘å┘ê┘é┘ü Ïº┘äÏ¬┘åÏ©┘è┘ü ÏÑÏ░Ïº ┘üÏ┤┘ä Ï¡┘üÏ© Queue.
   }
 
   try {
     await runtime.registry
       .disposeAll();
   } catch {
-    // لا نوقف التنظيف إذا فشل Driver.
+    // ┘äÏº ┘å┘ê┘é┘ü Ïº┘äÏ¬┘åÏ©┘è┘ü ÏÑÏ░Ïº ┘üÏ┤┘ä Driver.
   }
 }
 

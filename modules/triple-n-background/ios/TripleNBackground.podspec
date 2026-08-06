@@ -22,11 +22,11 @@ Pod::Spec.new do |s|
 
   s.summary =
     package['description'] ||
-    'Triple N background processing module'
+    'Triple N native module'
 
   s.description =
     package['description'] ||
-    'Triple N native iOS background processing module'
+    'Triple N native Expo module for iOS'
 
   s.license =
     package['license'] ||
@@ -59,30 +59,6 @@ Pod::Spec.new do |s|
   s.source_files =
     '**/*.{h,m,mm,swift}'
 
-  s.resources = [
-    'models/**/*.onnx',
-    'models/**/*.ort'
-  ]
-
-  # Secondary EdgeSAM pipeline is not part of production.
-  s.exclude_files = [
-    'EdgeSamNativeTypes.swift',
-    'EdgeSamNativePreprocessor.swift',
-    'EdgeSamNativeSessionManager.swift',
-    'EdgeSamNativeEncoder.swift',
-    'EdgeSamNativePromptBuilder.swift',
-    'EdgeSamNativeDecoder.swift',
-    'EdgeSamNativeCandidateSelector.swift',
-    'EdgeSamNativeMaskRestorer.swift',
-    'EdgeSamNativeMaskRefiner.swift',
-    'EdgeSamNativeBackgroundUnderstanding.swift',
-    'NativeTransparentImageExporter.swift'
-  ]
-
   s.dependency \
     'ExpoModulesCore'
-
-  s.dependency \
-    'onnxruntime-objc',
-    '1.24.3'
 end

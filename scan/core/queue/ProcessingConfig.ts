@@ -447,16 +447,16 @@ export type ProcessingConfigValidationResult = {
 export const DEFAULT_IOS_BACKGROUND_CONFIG:
   ProcessingIosBackgroundConfig = {
     enabled:
-      true,
+      false,
 
     minimumSupportedMajorVersion:
       26,
 
     useContinuedProcessingTask:
-      true,
+      false,
 
     fallbackToBackgroundTimeExtension:
-      true,
+      false,
 
     persistAfterEveryCompletedJob:
       true,
@@ -465,7 +465,7 @@ export const DEFAULT_IOS_BACKGROUND_CONFIG:
       true,
 
     requestNotificationPermission:
-      true,
+      false,
 
     backgroundTaskIdentifier:
       'com.naderahmed22.triplen.scan-processing',

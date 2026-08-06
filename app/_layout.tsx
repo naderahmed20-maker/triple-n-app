@@ -46,10 +46,6 @@ import {
 } from '@/lib/i18n';
 
 import {
-  registerForPushNotifications,
-} from '@/lib/notificationService';
-
-import {
   supabase,
 } from '@/lib/supabase';
 
@@ -102,19 +98,19 @@ type DeviceGateResult = {
  * ======================================================= */
 
 /**
- * الحد الأدنى الآمن لتشغيل EdgeSAM محليًا.
+ * Ø§Ù„Ø­Ø¯ Ø§Ù„Ø£Ø¯Ù†Ù‰ Ø§Ù„Ø¢Ù…Ù† Ù„ØªØ´ØºÙŠÙ„ EdgeSAM Ù…Ø­Ù„ÙŠÙ‹Ø§.
  *
- * Device.totalMemory قد يعرض قيمة أقل قليلًا
- * من الرقم التجاري المكتوب على الجهاز.
+ * Device.totalMemory Ù‚Ø¯ ÙŠØ¹Ø±Ø¶ Ù‚ÙŠÙ…Ø© Ø£Ù‚Ù„ Ù‚Ù„ÙŠÙ„Ù‹Ø§
+ * Ù…Ù† Ø§Ù„Ø±Ù‚Ù… Ø§Ù„ØªØ¬Ø§Ø±ÙŠ Ø§Ù„Ù…ÙƒØªÙˆØ¨ Ø¹Ù„Ù‰ Ø§Ù„Ø¬Ù‡Ø§Ø².
  *
- * لذلك هذا الحد يسمح للأجهزة من فئة 4 GB
- * أو أعلى بالمرور بصورة آمنة.
+ * Ù„Ø°Ù„Ùƒ Ù‡Ø°Ø§ Ø§Ù„Ø­Ø¯ ÙŠØ³Ù…Ø­ Ù„Ù„Ø£Ø¬Ù‡Ø²Ø© Ù…Ù† ÙØ¦Ø© 4 GB
+ * Ø£Ùˆ Ø£Ø¹Ù„Ù‰ Ø¨Ø§Ù„Ù…Ø±ÙˆØ± Ø¨ØµÙˆØ±Ø© Ø¢Ù…Ù†Ø©.
  */
 const MINIMUM_REPORTED_RAM_BYTES =
   3 * 1024 * 1024 * 1024;
 
 /**
- * القيمة المفضلة وليست شرط منع إضافيًا.
+ * Ø§Ù„Ù‚ÙŠÙ…Ø© Ø§Ù„Ù…ÙØ¶Ù„Ø© ÙˆÙ„ÙŠØ³Øª Ø´Ø±Ø· Ù…Ù†Ø¹ Ø¥Ø¶Ø§ÙÙŠÙ‹Ø§.
  */
 const RECOMMENDED_RAM_BYTES =
   4 * 1024 * 1024 * 1024;
@@ -198,8 +194,8 @@ function formatGigabytes(
 function isExpoGo():
   boolean {
   /**
-   * storeClient يعني أن التطبيق يعمل
-   * داخل Expo Go وليس Development Build.
+   * storeClient ÙŠØ¹Ù†ÙŠ Ø£Ù† Ø§Ù„ØªØ·Ø¨ÙŠÙ‚ ÙŠØ¹Ù…Ù„
+   * Ø¯Ø§Ø®Ù„ Expo Go ÙˆÙ„ÙŠØ³ Development Build.
    */
   return (
     Constants
@@ -965,17 +961,18 @@ export default function RootLayout() {
       true
     );
 
-  const backgroundProcessingInitializedRef =
-    useRef(
-      false
-    );
+  
+  const scanProcessingInitializedRef =
+  useRef(
+    false
+  );
 
-  const backgroundProcessingInitializationPromiseRef =
-    useRef<
-      Promise<void> | null
-    >(
-      null
-    );
+const scanProcessingInitializationPromiseRef =
+  useRef<
+    Promise<void> | null
+  >(
+    null
+  );
 
   const [
     deviceGate,
@@ -1079,61 +1076,58 @@ export default function RootLayout() {
   ]);
 
   /* =======================================================
-   * Background processing disposal
-   * ===================================================== */
+ * Scan processing disposal
+ * ===================================================== */
 
-  const disposeBackgroundProcessing =
-    useCallback(
-      async () => {
-        backgroundProcessingInitializedRef
-          .current =
-          false;
+const disposeScanProcessing =
+  useCallback(
+    async () => {
+      scanProcessingInitializedRef
+        .current =
+        false;
 
-        backgroundProcessingInitializationPromiseRef
-          .current =
-          null;
+      scanProcessingInitializationPromiseRef
+        .current =
+        null;
 
-        const results =
-          await Promise.allSettled([
-            import(
-              '@/scan/core/background'
-            ).then(
-              async module => {
-                await module
-                  .disposeBackgroundNotificationsBootstrap();
+      const results =
+        await Promise.allSettled([
+          import(
+            '@/scan/core/background'
+          ).then(
+            async module => {
+              await module
+                .disposeScanItemBackgroundProcessing();
+            }
+          ),
 
-                await module
-                  .disposeScanItemBackgroundProcessing();
-              }
-            ),
+          import(
+            '@/scan/core/ai/SegmentationEngine'
+          ).then(
+            async module => {
+              await module
+                .disposeSharedSegmentationEngine();
+            }
+          ),
+        ]);
 
-            import(
-              '@/scan/core/ai/SegmentationEngine'
-            ).then(
-              async module => {
-                await module
-                  .disposeSharedSegmentationEngine();
-              }
-            ),
-          ]);
-
-        for (
-          const result of
-          results
+      for (
+        const result of
+        results
+      ) {
+        if (
+          result.status ===
+            'rejected'
         ) {
-          if (
-            result.status ===
-              'rejected'
-          ) {
-            console.log(
-              'BACKGROUND PROCESSING DISPOSE ERROR:',
-              result.reason
-            );
-          }
+          console.log(
+            'SCAN PROCESSING DISPOSE ERROR:',
+            result.reason
+          );
         }
-      },
-      []
-    );
+      }
+    },
+    []
+  );
 
   /* =======================================================
    * Supabase session
@@ -1243,7 +1237,7 @@ export default function RootLayout() {
                 'SIGNED_OUT' ||
               !authenticated
             ) {
-              void disposeBackgroundProcessing();
+              void disposeScanProcessing();
             }
           }
         );
@@ -1258,323 +1252,210 @@ export default function RootLayout() {
     };
   }, [
     deviceGate.status,
-    disposeBackgroundProcessing,
+    disposeScanProcessing,
   ]);
 
-  /* =======================================================
-   * Push notification registration
-   * ===================================================== */
+/* =======================================================
+ * Scan Item foreground processing initialization
+ * ===================================================== */
 
-  useEffect(() => {
+useEffect(() => {
+  if (
+    deviceGate.status !==
+      'supported' ||
+    !sessionReady ||
+    !hasSession
+  ) {
+    return;
+  }
+
+  let active =
+    true;
+
+  async function initializeScanProcessingSystem():
+    Promise<void> {
     if (
-      deviceGate.status !==
-        'supported' ||
-      !sessionReady ||
-      !hasSession
+      scanProcessingInitializedRef
+        .current
     ) {
       return;
     }
 
-    void registerForPushNotifications()
-      .catch(
-        error => {
-          console.log(
-            'PUSH NOTIFICATION REGISTRATION ERROR:',
-            error
-          );
-        }
-      );
-  }, [
-    deviceGate.status,
-    sessionReady,
-    hasSession,
-  ]);
-
-  /* =======================================================
-   * Scan Item background processing initialization
-   * ===================================================== */
-
-  useEffect(() => {
     if (
-      deviceGate.status !==
-        'supported' ||
-      !sessionReady ||
-      !hasSession
+      scanProcessingInitializationPromiseRef
+        .current
     ) {
+      await scanProcessingInitializationPromiseRef
+        .current;
+
       return;
     }
 
-    let active =
-      true;
+    const initializationPromise =
+      (
+        async () => {
+          const [
+            processingModule,
+            wardrobeModule,
+          ] =
+            await Promise.all([
+              import(
+                '@/scan/core/background'
+              ),
 
-    async function initializeBackgroundProcessingSystem():
-      Promise<void> {
-      console.log('STARTUP: background initialization started', Date.now());
-      if (
-        backgroundProcessingInitializedRef
-          .current
-      ) {
-        return;
-      }
+              import(
+                '@/lib/wardrobeService'
+              ),
+            ]);
 
-      if (
-        backgroundProcessingInitializationPromiseRef
-          .current
-      ) {
-        await backgroundProcessingInitializationPromiseRef
-          .current;
+          if (
+            !active ||
+            !mountedRef.current
+          ) {
+            return;
+          }
 
-        return;
-      }
+          await processingModule
+            .initializeScanItemBackgroundProcessing({
+              updateWardrobeItem:
+                async input => {
+                  await wardrobeModule
+                    .updateWardrobeItem(
+                      input
+                        .wardrobeItemId,
+                      {
+                        image:
+                          input
+                            .processedImageUri,
 
-      const initializationPromise =
-        (
-          async () => {
-            console.log('STARTUP: importing background modules', Date.now());
+                        original_image_path:
+                          input
+                            .originalImageUri,
 
-            const [
-              backgroundModule,
-              wardrobeModule,
-            ] =
-              await Promise.all([
-                import(
-                  '@/scan/core/background'
-                ),
+                        cleaned_image_path:
+                          input
+                            .processedImageUri,
 
-                import(
-                  '@/lib/wardrobeService'
-                ),
-              ]);
+                        processing_status:
+                          'ready',
 
-            if (
-              !active ||
-              !mountedRef.current
-            ) {
-              return;
-            }
+                        processing_error:
+                          null,
 
-            console.log('STARTUP: background modules imported', Date.now());
-            console.log('STARTUP: scan background init started', Date.now());
+                        processing_finished_at:
+                          new Date()
+                            .toISOString(),
+                      }
+                    );
 
-            await backgroundModule
-              .initializeScanItemBackgroundProcessing({
-                updateWardrobeItem:
-                  async input => {
-                    await wardrobeModule
-                      .updateWardrobeItem(
-                        input
-                          .wardrobeItemId,
-                        {
-                          image:
-                            input
-                              .processedImageUri,
+                  return {
+                    updated:
+                      true,
 
-                          original_image_path:
-                            input
-                              .originalImageUri,
-
-                          cleaned_image_path:
-                            input
-                              .processedImageUri,
-
-                          processing_status:
-                            'ready',
-
-                          processing_error:
-                            null,
-
-                          processing_finished_at:
-                            new Date()
-                              .toISOString(),
-                        }
-                      );
-
-                    return {
-                      updated:
+                    metadata: {
+                      processedLocally:
                         true,
 
-                      metadata: {
-                        processedLocally:
-                          true,
+                      width:
+                        input.width,
 
-                        width:
-                          input.width,
+                      height:
+                        input.height,
 
-                        height:
-                          input.height,
+                      category:
+                        input.category,
 
-                        category:
-                          input.category,
+                      subcategory:
+                        input.subcategory,
 
-                        subcategory:
-                          input.subcategory,
-
-                        wardrobeType:
-                          input
-                            .wardrobeType,
-                      },
-                    };
-                  },
-
-                transparentImageQuality:
-                  100,
-
-                collectSegmentationDiagnostics:
-                  false,
-
-                reuseSegmentationSession:
-                  true,
-
-                processedFileNamePrefix:
-                  'scan-item-queue',
-
-               autoStartQueue:
-  true,
-
-autoStartBackgroundProcessing:
-  true,
-
-                enableDebugLogs:
-                  __DEV__,
-              });
-
-            if (
-              !active ||
-              !mountedRef.current
-            ) {
-              return;
-            }
-
-            console.log('STARTUP: scan background init finished', Date.now());
-            console.log('STARTUP: notifications init started', Date.now());
-
-            await backgroundModule
-              .initializeBackgroundProcessingNotifications({
-                requestPermissionOnInitialize:
-                  true,
-
-                enableDebugLogs:
-                  __DEV__,
-
-                notificationsConfig: {
-                  enabled:
-                    true,
-
-                  requestPermissionOnInitialize:
-                    true,
-
-                  notifyWhenProcessingStarts:
-                    false,
-
-                  notifyWhenSingleItemCompletes:
-                    false,
-
-                  notifyWhenBatchCompletes:
-                    true,
-
-                  notifyWhenProcessingFails:
-                    true,
-
-                  wardrobeRoute:
-                    '/wardrobe',
+                      wardrobeType:
+                        input
+                          .wardrobeType,
+                    },
+                  };
                 },
 
-                onOpenRoute:
-                  async (
-                    route,
-                    response
-                  ) => {
-                    if (
-                      !active ||
-                      !mountedRef.current
-                    ) {
-                      return;
-                    }
+              transparentImageQuality:
+                100,
 
-                    const normalizedRoute =
-                      route ===
-                        '/app/wardrobe'
-                        ? '/wardrobe'
-                        : route;
+              collectSegmentationDiagnostics:
+                false,
 
-                    if (
-                      normalizedRoute ===
-                        '/processing-image' &&
-                      response.batchId
-                    ) {
-                      router.push({
-                        pathname:
-                          '/processing-image',
+              reuseSegmentationSession:
+                true,
 
-                        params: {
-                          batchId:
-                            response.batchId,
-                        },
-                      } as never);
+              processedFileNamePrefix:
+                'scan-item-queue',
 
-                      return;
-                    }
+              /*
+               * تشغيل Queue مسموح أثناء فتح التطبيق.
+               */
+              autoStartQueue:
+                true,
 
-                    router.push(
-                      normalizedRoute as never
-                    );
-                  },
-              });
+              /*
+               * ممنوع طلب أي تنفيذ بعد إغلاق التطبيق.
+               */
+              autoStartBackgroundProcessing:
+                false,
 
-            if (
-              active &&
-              mountedRef.current
-            ) {
-              console.log('STARTUP: notifications init finished', Date.now());
-              backgroundProcessingInitializedRef
-                .current =
-                true;
-            }
+              enableDebugLogs:
+                __DEV__,
+            });
+
+          if (
+            active &&
+            mountedRef.current
+          ) {
+            scanProcessingInitializedRef
+              .current =
+              true;
           }
-        )();
+        }
+      )();
 
-      backgroundProcessingInitializationPromiseRef
-        .current =
+    scanProcessingInitializationPromiseRef
+      .current =
         initializationPromise;
 
-      try {
-        await initializationPromise;
-      } finally {
-        if (
-          backgroundProcessingInitializationPromiseRef
-            .current ===
-          initializationPromise
-        ) {
-          backgroundProcessingInitializationPromiseRef
-            .current =
-            null;
-        }
+    try {
+      await initializationPromise;
+    } finally {
+      if (
+        scanProcessingInitializationPromiseRef
+          .current ===
+        initializationPromise
+      ) {
+        scanProcessingInitializationPromiseRef
+          .current =
+          null;
       }
     }
+  }
 
-    void initializeBackgroundProcessingSystem()
-      .catch(
-        error => {
-          backgroundProcessingInitializedRef
-            .current =
-            false;
+  void initializeScanProcessingSystem()
+    .catch(
+      error => {
+        scanProcessingInitializedRef
+          .current =
+          false;
 
-          console.log(
-            'SCAN ITEM BACKGROUND PROCESSING INITIALIZATION ERROR:',
-            error
-          );
-        }
-      );
+        console.log(
+          'SCAN ITEM PROCESSING INITIALIZATION ERROR:',
+          error
+        );
+      }
+    );
 
-    return () => {
-      active =
-        false;
-    };
-  }, [
-    deviceGate.status,
-    sessionReady,
-    hasSession,
-  ]);
+  return () => {
+    active =
+      false;
+  };
+}, [
+  deviceGate.status,
+  sessionReady,
+  hasSession,
+]);
 
   /* =======================================================
    * Authentication navigation guard

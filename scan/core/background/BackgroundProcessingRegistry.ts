@@ -381,6 +381,15 @@ export class BackgroundProcessingRegistry {
       driver
     );
 
+    if (
+  platform ===
+    'ios'
+) {
+  throw new Error(
+    'iOS background processing drivers are disabled.'
+  );
+}
+
     const existing =
       this.registrations.get(
         platform
@@ -460,20 +469,6 @@ export class BackgroundProcessingRegistry {
         ...registration.metadata,
       },
     };
-  }
-
-  public registerIOS(
-    driver:
-      BackgroundProcessingDriver,
-    options:
-      RegisterBackgroundProcessingDriverOptions =
-        {}
-  ): BackgroundProcessingDriverRegistration {
-    return this.register(
-      'ios',
-      driver,
-      options
-    );
   }
 
   public registerAndroid(
@@ -664,11 +659,6 @@ export class BackgroundProcessingRegistry {
     this.service =
       new BackgroundProcessingService({
         queueService,
-
-        iosDriver:
-          this.getDriver(
-            'ios'
-          ),
 
         androidDriver:
           this.getDriver(
@@ -895,10 +885,7 @@ export class BackgroundProcessingRegistry {
         resolveCurrentPlatform(),
 
       iosRegistered:
-        this.registrations
-          .has(
-            'ios'
-          ),
+        false,
 
       androidRegistered:
         this.registrations
@@ -960,20 +947,6 @@ export function getDefaultBackgroundProcessingRegistry():
 /* =========================================================
  * Registration helpers
  * ======================================================= */
-
-export function registerIOSBackgroundProcessingDriver(
-  driver:
-    BackgroundProcessingDriver,
-  options:
-    RegisterBackgroundProcessingDriverOptions =
-      {}
-): BackgroundProcessingDriverRegistration {
-  return getDefaultBackgroundProcessingRegistry()
-    .registerIOS(
-      driver,
-      options
-    );
-}
 
 export function registerAndroidBackgroundProcessingDriver(
   driver:

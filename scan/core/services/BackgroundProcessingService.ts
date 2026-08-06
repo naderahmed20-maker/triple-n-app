@@ -28,35 +28,35 @@
 // BackgroundProcessingDriver
 
 import {
-    AppState,
-    Platform,
-    type AppStateStatus,
+  AppState,
+  Platform,
+  type AppStateStatus,
 } from 'react-native';
 
 import type {
-    ProcessingApplicationState,
-    ProcessingBackgroundCapability,
-    ProcessingBatchId,
-    ProcessingJob,
-    ProcessingJobError,
-    ProcessingJobId,
-    ProcessingPlatform,
-    ProcessingQueueEvent,
-    ProcessingQueueSnapshot,
-    ProcessingQueueStatus,
-    ProcessingTimestamp,
+  ProcessingApplicationState,
+  ProcessingBackgroundCapability,
+  ProcessingBatchId,
+  ProcessingJob,
+  ProcessingJobError,
+  ProcessingJobId,
+  ProcessingPlatform,
+  ProcessingQueueEvent,
+  ProcessingQueueSnapshot,
+  ProcessingQueueStatus,
+  ProcessingTimestamp,
 } from '../queue/QueueTypes';
 
 import type {
-    ProcessingQueueEventSubscription,
+  ProcessingQueueEventSubscription,
 } from '../queue/QueueEvents';
 
 import type {
-    ScanItemQueueService,
+  ScanItemQueueService,
 } from './ScanItemQueueService';
 
 import {
-    getDefaultScanItemQueueService,
+  getDefaultScanItemQueueService,
 } from './ScanItemQueueService';
 
 /* =========================================================
@@ -298,9 +298,6 @@ export type BackgroundProcessingDriver = {
 export type BackgroundProcessingServiceOptions = {
   queueService?:
     ScanItemQueueService;
-
-  iosDriver?:
-    BackgroundProcessingDriver | null;
 
   androidDriver?:
     BackgroundProcessingDriver | null;
@@ -776,9 +773,6 @@ export class BackgroundProcessingService {
   private readonly queueService:
     ScanItemQueueService;
 
-  private readonly iosDriver:
-    BackgroundProcessingDriver | null;
-
   private readonly androidDriver:
     BackgroundProcessingDriver | null;
 
@@ -940,10 +934,6 @@ export class BackgroundProcessingService {
     this.queueService =
       options.queueService ??
       getDefaultScanItemQueueService();
-
-    this.iosDriver =
-      options.iosDriver ??
-      null;
 
     this.androidDriver =
       options.androidDriver ??
@@ -2598,24 +2588,17 @@ export class BackgroundProcessingService {
    * ===================================================== */
 
   private resolveDriver():
-    BackgroundProcessingDriver | null {
-    if (
-      this.platform ===
-        'ios'
-    ) {
-      return this.iosDriver;
-    }
-
-    if (
-      this.platform ===
-        'android'
-    ) {
-      return this.androidDriver;
-    }
-
-    return this
-      .unknownPlatformDriver;
+  BackgroundProcessingDriver | null {
+  if (
+    this.platform ===
+      'android'
+  ) {
+    return this.androidDriver;
   }
+
+  return this
+    .unknownPlatformDriver;
+}
 
   /* =======================================================
    * Dispose
@@ -2657,14 +2640,6 @@ export class BackgroundProcessingService {
       new Set<
         BackgroundProcessingDriver
       >();
-
-    if (
-      this.iosDriver
-    ) {
-      drivers.add(
-        this.iosDriver
-      );
-    }
 
     if (
       this.androidDriver

@@ -25,7 +25,6 @@ export {
     getDefaultBackgroundProcessingRegistry,
     getRegisteredBackgroundProcessingService,
     registerAndroidBackgroundProcessingDriver,
-    registerIOSBackgroundProcessingDriver,
     registerUnknownBackgroundProcessingDriver
 } from './BackgroundProcessingRegistry';
 
@@ -36,29 +35,6 @@ export type {
     CreateRegisteredBackgroundProcessingServiceOptions,
     RegisterBackgroundProcessingDriverOptions
 } from './BackgroundProcessingRegistry';
-
-/* =========================================================
- * iOS driver
- * ======================================================= */
-
-export {
-    createIOSBackgroundProcessingDriver, IOSBackgroundProcessingDriver
-} from './IOSBackgroundProcessingDriver';
-
-export type {
-    IOSBackgroundExpirationEvent,
-    IOSBackgroundFailureEvent,
-    IOSBackgroundNativeCapabilityResult,
-    IOSBackgroundNativeStartRequest,
-    IOSBackgroundNativeStartResult,
-    IOSBackgroundNativeStopRequest,
-    IOSBackgroundNativeUpdateRequest,
-    IOSBackgroundProcessingDriverDiagnostics,
-    IOSBackgroundProcessingDriverOptions,
-    IOSBackgroundProcessingNativeModule,
-    IOSBackgroundResumeRequestedEvent,
-    IOSBackgroundStoppedEvent
-} from './IOSBackgroundProcessingDriver';
 
 /* =========================================================
  * Android driver

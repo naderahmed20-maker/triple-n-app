@@ -12,16 +12,6 @@
 //
 // ملاحظة:
 //
-// TripleNNativeProcessing الخاص بمعالجة EdgeSAM على iOS
-// لا يتم تحميله من هذا الملف.
-//
-// الربط الخاص به موجود بالفعل داخل:
-//
-// scan/core/native/NativeProcessingBridge.ts
-//
-// وبذلك لا نحاول تحميل TripleNNativeProcessing على Android
-// حيث إنه غير مسجل حاليًا كموديول Android مستقل.
-//
 
 import {
   NativeModule,

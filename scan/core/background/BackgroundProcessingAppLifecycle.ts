@@ -32,6 +32,7 @@
 
 import {
   AppState,
+  Platform,
   type AppStateStatus,
   type NativeEventSubscription,
 } from 'react-native';
@@ -488,6 +489,18 @@ type LifecycleTransitionContext = {
 function now():
   ProcessingTimestamp {
   return Date.now();
+}
+
+function supportsClosedAppBackgroundProcessing():
+  boolean {
+  /*
+   * استمرار المعالجة بعد خروج التطبيق من الواجهة
+   * مسموح على Android فقط.
+   *
+   * iOS يعتمد على المعالجة داخل التطبيق المفتوح فقط.
+   */
+  return Platform.OS ===
+    'android';
 }
 
 function getUnknownErrorMessage(
@@ -971,19 +984,20 @@ this.backgroundService =
       }
 
       if (
-        resolvedState ===
-          'background'
-      ) {
-        const result =
-          await this.startBackgroundIfNeeded();
+  resolvedState ===
+    'background' &&
+  supportsClosedAppBackgroundProcessing()
+) {
+  const result =
+    await this.startBackgroundIfNeeded();
 
-        backgroundStarted =
-          result.started;
+  backgroundStarted =
+    result.started;
 
-        this.appendWarnings(
-          result.warnings
-        );
-      }
+  this.appendWarnings(
+    result.warnings
+  );
+}
 
       this.appendWarnings(
         queueInitialization
@@ -1530,12 +1544,13 @@ this.backgroundService =
     context:
       LifecycleTransitionContext
   ): Promise<void> {
-    if (
-      this.config
-        .stopBackgroundTaskWhenApplicationBecomesActive &&
-      this.backgroundService
-        .isRunning()
-    ) {
+   if (
+  supportsClosedAppBackgroundProcessing() &&
+  this.config
+    .stopBackgroundTaskWhenApplicationBecomesActive &&
+  this.backgroundService
+    .isRunning()
+) {
       try {
         const result =
           await this.backgroundService
@@ -1603,35 +1618,53 @@ this.backgroundService =
    * ===================================================== */
 
   private async handleBackgroundState(
-    context:
-      LifecycleTransitionContext
-  ): Promise<void> {
-    if (
-      this.config
-        .flushQueueBeforeBackground
-    ) {
-      await this.flushQueue(
-        context
-      );
-    }
-
-    if (
-      !this.config
-        .startBackgroundTaskWhenApplicationEntersBackground
-    ) {
-      return;
-    }
-
-    const result =
-      await this.startBackgroundIfNeeded();
-
-    context.backgroundStarted =
-      result.started;
-
-    this.appendWarnings(
-      result.warnings
+  context:
+    LifecycleTransitionContext
+): Promise<void> {
+  /*
+   * نحفظ Queue على المنصتين حتى لا تضيع حالتها.
+   */
+  if (
+    this.config
+      .flushQueueBeforeBackground
+  ) {
+    await this.flushQueue(
+      context
     );
   }
+
+  /*
+   * iOS:
+   * لا نبدأ أي Native Background Task.
+   * المعالجة ستستكمل عند رجوع التطبيق للواجهة.
+   */
+  if (
+    !supportsClosedAppBackgroundProcessing()
+  ) {
+    return;
+  }
+
+  /*
+   * Android فقط:
+   * يحافظ على WorkManager / Foreground Service.
+   */
+  if (
+    !this.config
+      .startBackgroundTaskWhenApplicationEntersBackground
+  ) {
+    return;
+  }
+
+  const result =
+    await this.startBackgroundIfNeeded();
+
+  context.backgroundStarted =
+    result.started;
+
+  this.appendWarnings(
+    result.warnings
+  );
+}
 
   /* =======================================================
    * Queue
@@ -1782,6 +1815,13 @@ this.backgroundService =
     Promise<
       BackgroundProcessingStartResult
     > {
+      if (
+  !supportsClosedAppBackgroundProcessing()
+) {
+  return this.createNotStartedResult(
+    'Closed-app processing is disabled on iOS. Processing resumes while the app is open.'
+  );
+}
     this.assertNotDisposed();
 
     if (
@@ -2017,18 +2057,31 @@ this.backgroundService =
     });
 
     try {
-      if (
-        this.applicationState ===
-          'background'
-      ) {
-        const result =
-          await this.startBackgroundIfNeeded();
+     if (
+  this.applicationState ===
+    'background'
+) {
+  /*
+   * نحفظ الحالة فقط على iOS.
+   * Android يظل قادرًا على استكمال المعالجة بالخلفية.
+   */
+  if (
+    !supportsClosedAppBackgroundProcessing()
+  ) {
+    await this.queueService
+      .flush();
 
-        return (
-          result.started ||
-          result.alreadyRunning
-        );
-      }
+    return true;
+  }
+
+  const result =
+    await this.startBackgroundIfNeeded();
+
+  return (
+    result.started ||
+    result.alreadyRunning
+  );
+}
 
       const result =
         await this.resumeQueueIfNeeded();

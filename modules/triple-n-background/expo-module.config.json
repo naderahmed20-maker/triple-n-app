@@ -1,18 +1,10 @@
-{
-    "platforms":  [
-                      "apple",
-                      "android"
-                  ],
-    "apple":  {
-                  "modules":  [
-                                  "TripleNBackgroundModule",
-                                  "TripleNNativeProcessingModule"
-                              ],
-                  "podspecPath":  "ios/TripleNBackground.podspec"
-              },
-    "android":  {
-                    "modules":  [
-                                    "expo.modules.triplenbackground.TripleNBackgroundModule"
-                                ]
-                }
+﻿{
+  "platforms": [
+    "android"
+  ],
+  "android": {
+    "modules": [
+      "expo.modules.triplenbackground.TripleNBackgroundModule"
+    ]
+  }
 }
