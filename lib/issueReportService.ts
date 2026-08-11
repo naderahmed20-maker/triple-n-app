@@ -438,6 +438,47 @@ function getUnknownErrorMessage(
     }
   }
 
+  /*
+   * Supabase/PostgREST errors are often plain objects rather
+   * than native Error instances.
+   */
+  if (
+    typeof error ===
+      'object' &&
+    error !==
+      null
+  ) {
+    const record =
+      error as Record<
+        string,
+        unknown
+      >;
+
+    const candidates = [
+      record.message,
+      record.details,
+      record.hint,
+      record.code,
+    ];
+
+    for (
+      const candidate of
+      candidates
+    ) {
+      if (
+        typeof candidate ===
+          'string' &&
+        candidate
+          .trim()
+          .length >
+          0
+      ) {
+        return candidate
+          .trim();
+      }
+    }
+  }
+
   return fallback;
 }
 
@@ -1303,6 +1344,20 @@ export async function submitIssueReport(
       );
     }
 
+    const reportData =
+      isRecord(
+        data.report
+      )
+        ? data.report
+        : {};
+
+    const statisticsData =
+      isRecord(
+        data.statistics
+      )
+        ? data.statistics
+        : {};
+
     const successValue =
       readFirstAvailableValue(
         data,
@@ -1347,7 +1402,7 @@ export async function submitIssueReport(
     const reportId =
       normalizeOptionalText(
         readFirstAvailableValue(
-          data,
+          reportData,
           [
             'report_id',
             'reportId',
@@ -1361,7 +1416,7 @@ export async function submitIssueReport(
     const resultIssueCode =
       normalizeOptionalText(
         readFirstAvailableValue(
-          data,
+          reportData,
           [
             'issue_code',
             'issueCode',
@@ -1376,7 +1431,7 @@ export async function submitIssueReport(
     const issueTitle =
       normalizeOptionalText(
         readFirstAvailableValue(
-          data,
+          reportData,
           [
             'issue_title',
             'issueTitle',
@@ -1390,7 +1445,7 @@ export async function submitIssueReport(
     const reportCount =
       normalizeInteger(
         readFirstAvailableValue(
-          data,
+          reportData,
           [
             'report_count',
             'reportCount',
@@ -1404,7 +1459,7 @@ export async function submitIssueReport(
     const uniqueReporters =
       normalizeInteger(
         readFirstAvailableValue(
-          data,
+          statisticsData,
           [
             'unique_reporters',
             'uniqueReporters',
@@ -1417,7 +1472,7 @@ export async function submitIssueReport(
     const totalReports =
       normalizeInteger(
         readFirstAvailableValue(
-          data,
+          statisticsData,
           [
             'total_reports',
             'totalReports',

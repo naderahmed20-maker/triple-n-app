@@ -80,7 +80,7 @@ const PROBLEM_OPTIONS:
   readonly ProblemOption[] = [
     {
       code:
-        'scan-not-completing',
+        'scan_item_not_completed',
 
       icon:
         'camera-off',
@@ -100,7 +100,7 @@ const PROBLEM_OPTIONS:
 
     {
       code:
-        'processed-image-not-visible',
+        'processed_item_not_visible',
 
       icon:
         'image',
@@ -120,7 +120,7 @@ const PROBLEM_OPTIONS:
 
     {
       code:
-        'app-freezing-or-slow',
+        'app_slow_or_frozen',
 
       icon:
         'activity',
@@ -140,27 +140,27 @@ const PROBLEM_OPTIONS:
 
     {
       code:
-        'wardrobe-items-missing',
+        'background_removal_problem',
 
       icon:
-        'archive',
+        'scissors',
 
       titleKey:
-        'issueReport.problemWardrobeItemsMissing',
+        'issueReport.problemBackgroundRemoval',
 
       descriptionKey:
-        'issueReport.problemWardrobeItemsMissingDescription',
+        'issueReport.problemBackgroundRemovalDescription',
 
       fallbackTitle:
-        'Wardrobe items are missing',
+        'Background removal result is incorrect',
 
       fallbackDescription:
-        'One or more saved wardrobe items are missing, empty, or do not load correctly.',
+        'Part of the clothing item is missing, unwanted background remains visible, or the cleaned result is incorrect.',
     },
 
     {
       code:
-        'outfit-results-incorrect',
+        'outfit_or_wardrobe_problem',
 
       icon:
         'shuffle',

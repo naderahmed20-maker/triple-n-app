@@ -10,7 +10,7 @@ import {
 import {
   WARDROBE_TYPE_KEY,
   type WardrobeType,
-} from './data/clothingCategories';
+} from '../data/clothingCategories';
 export default function WardrobeTypeScreen() {
   const { t } =
     useTranslation();

@@ -37,22 +37,22 @@ import {
   loadTemperatureUnit,
   loadWeatherContext,
   type TemperatureUnit,
-} from '../data/appContext';
+} from '../../data/appContext';
 
 import {
   type FashionEngineResult,
   type FashionItem,
-  pickSmartFashionOutfit,
+  getFashionOutfitResult,
   type ScoredFashionOutfit,
-} from '../data/fashionEngine';
+} from '../../data/fashionEngine';
 
 import {
   type SeasonType,
   type StyleType,
   type WeatherType,
-} from '../data/fashionRules';
+} from '../../data/fashionRules';
 
-import OutfitCanvas from './components/OutfitCanvas';
+import OutfitCanvas from '../../components/triple-n/OutfitCanvas';
 
 const SETTINGS_KEY =
   'TRIPLE_N_SETTINGS';
@@ -77,7 +77,7 @@ type AccessoryPromptStep =
   | 'askForBag'
   | 'askForCap';
 
-export default function SmartSuggestionScreen() {
+export default function RandomOutfitScreen() {
   const {
     t,
     language,
@@ -193,8 +193,31 @@ export default function SmartSuggestionScreen() {
           }
 
           const wardrobeItems =
-            wardrobe as
-              FashionItem[];
+            wardrobe
+              .filter(
+                item =>
+                  !item.processing_status ||
+                  item.processing_status ===
+                    'ready'
+              )
+              .map(
+                item => ({
+                  ...item,
+
+                  /*
+                   * Outfit generation must use the final
+                   * cleaned image when processing succeeded.
+                   *
+                   * category / subCategory / name / color
+                   * remain untouched.
+                   */
+                  image:
+                    item
+                      .cleaned_image_path
+                      ?.trim() ||
+                    item.image,
+                })
+              ) as FashionItem[];
 
           setItems(
             wardrobeItems
@@ -213,7 +236,7 @@ export default function SmartSuggestionScreen() {
           );
 
           const result =
-            buildSmartResult(
+            buildRandomResult(
               wardrobeItems,
               savedStyle,
               context
@@ -675,7 +698,7 @@ export default function SmartSuggestionScreen() {
     return 'Mild';
   }
 
-  function buildSmartResult(
+  function buildRandomResult(
     wardrobe:
       FashionItem[],
 
@@ -685,15 +708,85 @@ export default function SmartSuggestionScreen() {
     context:
       AppWeatherContext
   ): FashionEngineResult {
-    return pickSmartFashionOutfit(
-      wardrobe,
-      style,
-      getWeatherType(
-        context
-      ),
-      SUMMER_SEASON,
-      language
-    );
+    const result =
+      getFashionOutfitResult(
+        wardrobe,
+        {
+          style,
+
+          weather:
+            getWeatherType(
+              context
+            ),
+
+          season:
+            SUMMER_SEASON,
+
+          language,
+
+          limit:
+            20,
+        }
+      );
+
+    if (
+      result
+        .suitableOutfits
+        .length <= 1
+    ) {
+      return result;
+    }
+
+    /*
+     * Random mode randomizes only outfits that already
+     * passed the normal fashion rules.
+     */
+    const randomized =
+      [
+        ...result
+          .suitableOutfits,
+      ];
+
+    for (
+      let index =
+        randomized.length - 1;
+      index > 0;
+      index -= 1
+    ) {
+      const swapIndex =
+        Math.floor(
+          Math.random() *
+            (index + 1)
+        );
+
+      const temporary =
+        randomized[
+          index
+        ];
+
+      randomized[
+        index
+      ] =
+        randomized[
+          swapIndex
+        ];
+
+      randomized[
+        swapIndex
+      ] =
+        temporary;
+    }
+
+    return {
+      ...result,
+
+      suitableOutfits:
+        randomized,
+
+      bestOutfit:
+        randomized[0] ||
+        null,
+    };
   }
 
   function generateAgain() {
@@ -763,7 +856,7 @@ export default function SmartSuggestionScreen() {
             ) as FashionItem[];
 
       const result =
-        buildSmartResult(
+        buildRandomResult(
           wardrobe,
           savedStyle,
           context

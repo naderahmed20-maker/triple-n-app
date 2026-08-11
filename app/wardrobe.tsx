@@ -5,6 +5,9 @@ import {
 import {
   getMyProfile,
 } from '@/lib/profileService';
+import {
+  migrateLegacyWardrobeImages,
+} from '@/lib/legacyWardrobeImageMigration';
 
 import {
   WardrobeItem,
@@ -56,7 +59,7 @@ import {
   WardrobeType,
   getCategoryTranslationKey,
   normalizeCategory,
-} from './data/clothingCategories';
+} from '../data/clothingCategories';
 
 /* =========================================================
  * Types
@@ -91,10 +94,10 @@ type DisplayItem =
  * ======================================================= */
 
 /**
- * النسخة الصيفية لا تعرض الجاكيتات.
+ * Ø§Ù„Ù†Ø³Ø®Ø© Ø§Ù„ØµÙŠÙÙŠØ© Ù„Ø§ ØªØ¹Ø±Ø¶ Ø§Ù„Ø¬Ø§ÙƒÙŠØªØ§Øª.
  *
- * حتى لو كانت هناك عناصر Jackets قديمة داخل قاعدة البيانات،
- * لن تظهر داخل الدولاب أو الفلاتر.
+ * Ø­ØªÙ‰ Ù„Ùˆ ÙƒØ§Ù†Øª Ù‡Ù†Ø§Ùƒ Ø¹Ù†Ø§ØµØ± Jackets Ù‚Ø¯ÙŠÙ…Ø© Ø¯Ø§Ø®Ù„ Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§ØªØŒ
+ * Ù„Ù† ØªØ¸Ù‡Ø± Ø¯Ø§Ø®Ù„ Ø§Ù„Ø¯ÙˆÙ„Ø§Ø¨ Ø£Ùˆ Ø§Ù„ÙÙ„Ø§ØªØ±.
  */
 const HIDDEN_SUMMER_CATEGORIES =
   new Set([
@@ -103,8 +106,8 @@ const HIDDEN_SUMMER_CATEGORIES =
   ]);
 
   /**
- * لا نظهر رسالة اكتمال الدولاب إلا عند نجاح
- * معالجة أكثر من أربع صور في جلسة واحدة.
+ * Ù„Ø§ Ù†Ø¸Ù‡Ø± Ø±Ø³Ø§Ù„Ø© Ø§ÙƒØªÙ…Ø§Ù„ Ø§Ù„Ø¯ÙˆÙ„Ø§Ø¨ Ø¥Ù„Ø§ Ø¹Ù†Ø¯ Ù†Ø¬Ø§Ø­
+ * Ù…Ø¹Ø§Ù„Ø¬Ø© Ø£ÙƒØ«Ø± Ù…Ù† Ø£Ø±Ø¨Ø¹ ØµÙˆØ± ÙÙŠ Ø¬Ù„Ø³Ø© ÙˆØ§Ø­Ø¯Ø©.
  */
 const MINIMUM_COMPLETED_ITEMS_FOR_READY_MESSAGE =
   5;
@@ -284,8 +287,8 @@ function getDisplayImage(
     ProcessingJob | null
 ): string {
   /**
-   * بعد اكتمال المعالجة نعرض الصورة الناتجة مباشرة
-   * من Queue، دون انتظار جلب Supabase التالي.
+   * Ø¨Ø¹Ø¯ Ø§ÙƒØªÙ…Ø§Ù„ Ø§Ù„Ù…Ø¹Ø§Ù„Ø¬Ø© Ù†Ø¹Ø±Ø¶ Ø§Ù„ØµÙˆØ±Ø© Ø§Ù„Ù†Ø§ØªØ¬Ø© Ù…Ø¨Ø§Ø´Ø±Ø©
+   * Ù…Ù† QueueØŒ Ø¯ÙˆÙ† Ø§Ù†ØªØ¸Ø§Ø± Ø¬Ù„Ø¨ Supabase Ø§Ù„ØªØ§Ù„ÙŠ.
    */
   if (
     queueJob?.output
@@ -297,7 +300,7 @@ function getDisplayImage(
   }
 
   /**
-   * أثناء المعالجة نعرض الصورة الأصلية.
+   * Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„Ù…Ø¹Ø§Ù„Ø¬Ø© Ù†Ø¹Ø±Ø¶ Ø§Ù„ØµÙˆØ±Ø© Ø§Ù„Ø£ØµÙ„ÙŠØ©.
    */
   if (
     isQueueJobPending(
@@ -357,7 +360,7 @@ function getItemProgress(
       'processing'
   ) {
     /**
-     * قيمة بصرية مبدئية فقط لحين وصول أول
+     * Ù‚ÙŠÙ…Ø© Ø¨ØµØ±ÙŠØ© Ù…Ø¨Ø¯Ø¦ÙŠØ© ÙÙ‚Ø· Ù„Ø­ÙŠÙ† ÙˆØµÙˆÙ„ Ø£ÙˆÙ„
      * Queue progress event.
      */
     return 0.08;
@@ -488,11 +491,11 @@ export default function WardrobeScreen() {
     );
 
   /**
-   * نسجل فقط الـJobs التي شاهدناها وهي معلقة
-   * في جلسة المعالجة الحالية.
+   * Ù†Ø³Ø¬Ù„ ÙÙ‚Ø· Ø§Ù„Ù€Jobs Ø§Ù„ØªÙŠ Ø´Ø§Ù‡Ø¯Ù†Ø§Ù‡Ø§ ÙˆÙ‡ÙŠ Ù…Ø¹Ù„Ù‚Ø©
+   * ÙÙŠ Ø¬Ù„Ø³Ø© Ø§Ù„Ù…Ø¹Ø§Ù„Ø¬Ø© Ø§Ù„Ø­Ø§Ù„ÙŠØ©.
    *
-   * هذا يمنع ظهور رسالة التهنئة عند فتح التطبيق
-   * بسبب Jobs قديمة مكتملة ومحفوظة في الـQueue.
+   * Ù‡Ø°Ø§ ÙŠÙ…Ù†Ø¹ Ø¸Ù‡ÙˆØ± Ø±Ø³Ø§Ù„Ø© Ø§Ù„ØªÙ‡Ù†Ø¦Ø© Ø¹Ù†Ø¯ ÙØªØ­ Ø§Ù„ØªØ·Ø¨ÙŠÙ‚
+   * Ø¨Ø³Ø¨Ø¨ Jobs Ù‚Ø¯ÙŠÙ…Ø© Ù…ÙƒØªÙ…Ù„Ø© ÙˆÙ…Ø­ÙÙˆØ¸Ø© ÙÙŠ Ø§Ù„Ù€Queue.
    */
   const observedProcessingJobIdsRef =
     useRef<
@@ -631,6 +634,51 @@ export default function WardrobeScreen() {
                 )
             )
           );
+
+          void migrateLegacyWardrobeImages(
+            data,
+            user.id
+          )
+            .then(
+              async migratedCount => {
+                if (
+                  !active ||
+                  migratedCount ===
+                    0
+                ) {
+                  return;
+                }
+
+                const refreshed =
+                  await getMyWardrobeItems();
+
+                if (!active) {
+                  return;
+                }
+
+                setItems(
+                  refreshed.filter(
+                    item =>
+                      !isWinterCategory(
+                        item.category
+                      )
+                  )
+                );
+
+                console.log(
+                  'WARDROBE LEGACY MIGRATION COMPLETE:',
+                  migratedCount
+                );
+              }
+            )
+            .catch(
+              error => {
+                console.warn(
+                  'WARDROBE LEGACY MIGRATION FAILED:',
+                  error
+                );
+              }
+            );
         } catch (
           error:
             unknown
@@ -707,11 +755,11 @@ export default function WardrobeScreen() {
             );
 
             /**
-             * بعد اكتمال أو فشل Job نعيد قراءة
-             * عنصر الدولاب من Supabase.
+             * Ø¨Ø¹Ø¯ Ø§ÙƒØªÙ…Ø§Ù„ Ø£Ùˆ ÙØ´Ù„ Job Ù†Ø¹ÙŠØ¯ Ù‚Ø±Ø§Ø¡Ø©
+             * Ø¹Ù†ØµØ± Ø§Ù„Ø¯ÙˆÙ„Ø§Ø¨ Ù…Ù† Supabase.
              *
-             * الصورة النهائية تظهر فورًا من output،
-             * وإعادة القراءة توحّد الحالة الدائمة.
+             * Ø§Ù„ØµÙˆØ±Ø© Ø§Ù„Ù†Ù‡Ø§Ø¦ÙŠØ© ØªØ¸Ù‡Ø± ÙÙˆØ±Ù‹Ø§ Ù…Ù† outputØŒ
+             * ÙˆØ¥Ø¹Ø§Ø¯Ø© Ø§Ù„Ù‚Ø±Ø§Ø¡Ø© ØªÙˆØ­Ù‘Ø¯ Ø§Ù„Ø­Ø§Ù„Ø© Ø§Ù„Ø¯Ø§Ø¦Ù…Ø©.
              */
             if (
               event?.type ===
@@ -884,7 +932,7 @@ export default function WardrobeScreen() {
       0
     ) {
       /**
-       * بداية جلسة جديدة بعد انتهاء الجلسة السابقة.
+       * Ø¨Ø¯Ø§ÙŠØ© Ø¬Ù„Ø³Ø© Ø¬Ø¯ÙŠØ¯Ø© Ø¨Ø¹Ø¯ Ø§Ù†ØªÙ‡Ø§Ø¡ Ø§Ù„Ø¬Ù„Ø³Ø© Ø§Ù„Ø³Ø§Ø¨Ù‚Ø©.
        */
       if (
         !processingSessionObservedRef
@@ -918,8 +966,8 @@ export default function WardrobeScreen() {
     }
 
     /**
-     * لا نعرض رسالة بناءً على Jobs قديمة كانت
-     * مكتملة بالفعل عند فتح شاشة الدولاب.
+     * Ù„Ø§ Ù†Ø¹Ø±Ø¶ Ø±Ø³Ø§Ù„Ø© Ø¨Ù†Ø§Ø¡Ù‹ Ø¹Ù„Ù‰ Jobs Ù‚Ø¯ÙŠÙ…Ø© ÙƒØ§Ù†Øª
+     * Ù…ÙƒØªÙ…Ù„Ø© Ø¨Ø§Ù„ÙØ¹Ù„ Ø¹Ù†Ø¯ ÙØªØ­ Ø´Ø§Ø´Ø© Ø§Ù„Ø¯ÙˆÙ„Ø§Ø¨.
      */
     if (
       !processingSessionObservedRef
@@ -1407,8 +1455,8 @@ if (
     }
 
     /**
-     * أثناء المعالجة لا نفتح شاشة أو رسالة.
-     * القطعة تظل تكمل بصمت داخل الدولاب.
+     * Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„Ù…Ø¹Ø§Ù„Ø¬Ø© Ù„Ø§ Ù†ÙØªØ­ Ø´Ø§Ø´Ø© Ø£Ùˆ Ø±Ø³Ø§Ù„Ø©.
+     * Ø§Ù„Ù‚Ø·Ø¹Ø© ØªØ¸Ù„ ØªÙƒÙ…Ù„ Ø¨ØµÙ…Øª Ø¯Ø§Ø®Ù„ Ø§Ù„Ø¯ÙˆÙ„Ø§Ø¨.
      */
     if (
       item.pending
@@ -1417,8 +1465,8 @@ if (
     }
 
     /**
-     * العنصر الفاشل يبقى قابلًا للحذف من وضع الحذف،
-     * ولا نعرض نصوص حالة داخل الكارت.
+     * Ø§Ù„Ø¹Ù†ØµØ± Ø§Ù„ÙØ§Ø´Ù„ ÙŠØ¨Ù‚Ù‰ Ù‚Ø§Ø¨Ù„Ù‹Ø§ Ù„Ù„Ø­Ø°Ù Ù…Ù† ÙˆØ¶Ø¹ Ø§Ù„Ø­Ø°ÙØŒ
+     * ÙˆÙ„Ø§ Ù†Ø¹Ø±Ø¶ Ù†ØµÙˆØµ Ø­Ø§Ù„Ø© Ø¯Ø§Ø®Ù„ Ø§Ù„ÙƒØ§Ø±Øª.
      */
     if (
       item.failed
@@ -1461,9 +1509,9 @@ if (
   }
 
   /**
-   * لا توجد Gallery ولا Add Item تقليدية.
+   * Ù„Ø§ ØªÙˆØ¬Ø¯ Gallery ÙˆÙ„Ø§ Add Item ØªÙ‚Ù„ÙŠØ¯ÙŠØ©.
    *
-   * Scan Item هو الطريق الوحيد لإضافة قطعة.
+   * Scan Item Ù‡Ùˆ Ø§Ù„Ø·Ø±ÙŠÙ‚ Ø§Ù„ÙˆØ­ÙŠØ¯ Ù„Ø¥Ø¶Ø§ÙØ© Ù‚Ø·Ø¹Ø©.
    */
   function openScanItem():
     void {
@@ -1568,7 +1616,7 @@ if (
                       styles.homeButtonText
                     }
                   >
-                    ‹
+                    {'\u2039'}
                   </Text>
                 </TouchableOpacity>
 
@@ -1599,7 +1647,7 @@ if (
                       items.length
                     )}
 
-                    {' • '}
+                    {' â€¢ '}
 
                     {wardrobeType ===
                     'female'
@@ -1632,7 +1680,7 @@ if (
                           1
                             ? 'item'
                             : 'items'
-                        } · About ${estimatedRemainingMinutes} ${
+                        } Â· About ${estimatedRemainingMinutes} ${
                           estimatedRemainingMinutes ===
                           1
                             ? 'minute'
@@ -1879,8 +1927,8 @@ if (
                       }
                     >
                       {item.favorite
-                        ? '❤️'
-                        : '🤍'}
+                        ? '\u2764\uFE0F'
+                        : '\uD83E\uDD0D'}
                     </Text>
                   </TouchableOpacity>
                 ) : null}
@@ -1948,7 +1996,7 @@ if (
                         styles.checkText
                       }
                     >
-                      ✓
+                      âœ“
                     </Text>
                   </View>
                 ) : null}
@@ -1973,7 +2021,7 @@ if (
               styles.fixedAddButtonText
             }
           >
-            ＋{' '}
+            {'\uFF0B'}{' '}
             {t(
               'wardrobe.scanItem'
             )}
@@ -2052,7 +2100,7 @@ if (
                     styles.wardrobeReadyIconText
                   }
                 >
-                  ✓
+                  âœ“
                 </Text>
               </View>
 

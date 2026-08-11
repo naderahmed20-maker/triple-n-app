@@ -910,6 +910,13 @@ export default function SettingsScreen() {
     );
   }
 
+  function openPayment():
+  void {
+  router.push(
+    '/payment' as never
+  );
+}
+
   function resetAppData() {
     Alert.alert(
       t(
@@ -1105,6 +1112,84 @@ export default function SettingsScreen() {
             }
           />
         </View>
+
+        <TouchableOpacity
+  style={
+    styles.premiumCard
+  }
+  onPress={
+    openPayment
+  }
+  activeOpacity={
+    0.86
+  }
+>
+  <View
+    style={
+      styles.premiumIcon
+    }
+  >
+    <Feather
+      name="star"
+      size={24}
+      color="#111111"
+    />
+  </View>
+
+  <View
+    style={
+      styles.premiumTextBox
+    }
+  >
+    <View
+      style={
+        styles.premiumTitleRow
+      }
+    >
+      <Text
+        style={
+          styles.premiumTitle
+        }
+      >
+        Triple N Premium
+      </Text>
+
+      <View
+        style={
+          styles.premiumComingSoon
+        }
+      >
+        <Text
+          style={
+            styles.premiumComingSoonText
+          }
+        >
+          SOON
+        </Text>
+      </View>
+    </View>
+
+    <Text
+      style={
+        styles.premiumSubtitle
+      }
+    >
+      Explore premium plans and the complete Triple N experience.
+    </Text>
+  </View>
+
+  <View
+    style={
+      styles.premiumArrow
+    }
+  >
+    <Feather
+      name="chevron-right"
+      size={22}
+      color="#f1d8c2"
+    />
+  </View>
+</TouchableOpacity>
 
         <TouchableOpacity
           style={
@@ -1895,4 +1980,166 @@ const styles =
     disabledButton: {
       opacity: 0.55,
     },
+
+    premiumCard: {
+  minHeight:
+    104,
+
+  marginTop:
+    22,
+
+  paddingHorizontal:
+    18,
+
+  paddingVertical:
+    17,
+
+  flexDirection:
+    'row',
+
+  alignItems:
+    'center',
+
+  borderWidth:
+    1,
+
+  borderColor:
+    'rgba(241,216,194,0.42)',
+
+  borderRadius:
+    26,
+
+  backgroundColor:
+    '#15171c',
+},
+
+premiumIcon: {
+  width:
+    52,
+
+  height:
+    52,
+
+  alignItems:
+    'center',
+
+  justifyContent:
+    'center',
+
+  borderRadius:
+    26,
+
+  backgroundColor:
+    '#f1d8c2',
+},
+
+premiumTextBox: {
+  flex:
+    1,
+
+  marginLeft:
+    15,
+
+  paddingRight:
+    8,
+},
+
+premiumTitleRow: {
+  flexDirection:
+    'row',
+
+  alignItems:
+    'center',
+
+  flexWrap:
+    'wrap',
+},
+
+premiumTitle: {
+  color:
+    '#ffffff',
+
+  fontSize:
+    16,
+
+  lineHeight:
+    22,
+
+  fontWeight:
+    '900',
+},
+
+premiumComingSoon: {
+  marginLeft:
+    8,
+
+  paddingHorizontal:
+    7,
+
+  paddingVertical:
+    3,
+
+  borderRadius:
+    999,
+
+  backgroundColor:
+    '#f1d8c2',
+},
+
+premiumComingSoonText: {
+  color:
+    '#111111',
+
+  fontSize:
+    8,
+
+  fontWeight:
+    '900',
+
+  letterSpacing:
+    0.7,
+},
+
+premiumSubtitle: {
+  marginTop:
+    6,
+
+  color:
+    '#8f9299',
+
+  fontSize:
+    12,
+
+  lineHeight:
+    18,
+
+  fontWeight:
+    '600',
+},
+
+premiumArrow: {
+  width:
+    34,
+
+  height:
+    34,
+
+  alignItems:
+    'center',
+
+  justifyContent:
+    'center',
+
+  borderWidth:
+    1,
+
+  borderColor:
+    '#30333a',
+
+  borderRadius:
+    17,
+
+  backgroundColor:
+    '#1d2026',
+},
   });

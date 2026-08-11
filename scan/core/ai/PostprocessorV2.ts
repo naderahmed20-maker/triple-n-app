@@ -3518,8 +3518,12 @@ if (
   hasUsableImageAnalysis &&
   !imageGuidedResult.reliable
 ) {
+  /*
+   * Unreliable image analysis is only a weak negative signal.
+   * It must not beat a geometrically/model-supported full item.
+   */
   finalCombinedScore -=
-    0.08;
+    0.04;
 }
 
 /*
@@ -3530,17 +3534,18 @@ if (
  */
 if (
   hasUsableImageAnalysis &&
+  imageGuidedResult.reliable &&
   suspectedBackgroundRatio >
-    0.18
+    0.24
 ) {
   const leakagePenalty =
     Math.min(
-      0.32,
+      0.20,
       (
         suspectedBackgroundRatio -
-        0.18
+        0.24
       ) *
-        0.85
+        0.55
     );
 
   finalCombinedScore -=
@@ -3553,17 +3558,18 @@ if (
  */
 if (
   hasUsableImageAnalysis &&
+  imageGuidedResult.reliable &&
   leakageResistance <
-    0.52
+    0.42
 ) {
   const resistancePenalty =
     Math.min(
-      0.18,
+      0.10,
       (
-        0.52 -
+        0.42 -
         leakageResistance
       ) *
-        0.55
+        0.35
     );
 
   finalCombinedScore -=
@@ -3577,13 +3583,14 @@ if (
  */
 if (
   hasUsableImageAnalysis &&
+  imageGuidedResult.reliable &&
   suspectedBackgroundRatio >
-    0.42
+    0.55
 ) {
   finalCombinedScore =
     Math.min(
       finalCombinedScore,
-      0.38
+      0.50
     );
 }
 
@@ -10927,9 +10934,9 @@ function applyBackgroundUnderstandingToMaskV3(
       isStrongBackground &&
       isConnectedBackground &&
       background >=
-        0.64 &&
+        0.68 &&
       foreground <=
-        0.58
+        0.50
     ) {
       const confidenceStrength =
         clampUnitValue(
@@ -10943,32 +10950,32 @@ function applyBackgroundUnderstandingToMaskV3(
       const foregroundResistance =
         clampUnitValue(
           foreground *
-            0.72
+            0.92
         );
 
       const edgeResistance =
         clampUnitValue(
           barrier *
-            0.62
+            0.82
         );
 
       const uncertaintyResistance =
         clampUnitValue(
           pixelUncertainty *
-            0.42
+            0.52
         );
 
       const removalStrength =
         clampUnitValue(
           confidenceStrength *
           (
-            0.9 -
+            0.82 -
             foregroundResistance *
-              0.36 -
+              0.42 -
             edgeResistance *
-              0.32 -
+              0.38 -
             uncertaintyResistance *
-              0.22
+              0.26
           )
         );
 
@@ -10985,13 +10992,13 @@ function applyBackgroundUnderstandingToMaskV3(
        */
       if (
         background >=
-          0.84 &&
+          0.86 &&
         foreground <=
-          0.34 &&
+          0.22 &&
         barrier <=
-          0.42 &&
+          0.30 &&
         pixelUncertainty <=
-          0.46
+          0.34
       ) {
         const hardRemovalStrength =
           clampUnitValue(
@@ -11068,8 +11075,8 @@ function applyBackgroundUnderstandingToMaskV3(
       sourceValue <= 0.2
         ? 1
         : sourceValue <= 0.5
-          ? 0.86
-          : 0.68;
+          ? 0.72
+          : 0.42;
 
     const safeRemovalStrength =
       clampUnitValue(
@@ -11097,11 +11104,11 @@ function applyBackgroundUnderstandingToMaskV3(
     if (
       isConnectedBackground &&
       sourceValue <=
-        0.34 &&
+        0.26 &&
       background >=
-        0.56 &&
+        0.60 &&
       foreground <=
-        0.5
+        0.42
     ) {
       const softBackgroundRemoval =
         clampUnitValue(
@@ -11130,7 +11137,7 @@ function applyBackgroundUnderstandingToMaskV3(
             (
               1 -
               softBackgroundRemoval *
-                0.88
+                0.80
             )
         );
     }
@@ -11147,14 +11154,14 @@ function applyBackgroundUnderstandingToMaskV3(
      */
     if (
       foregroundAdvantage >=
-        0.08 &&
+        0.05 &&
       foreground >=
-        0.54
+        0.48
     ) {
       const sourceSupport =
         smoothStep(
-          0.12,
-          0.58,
+          0.08,
+          0.52,
           sourceValue
         );
 
@@ -11187,7 +11194,7 @@ function applyBackgroundUnderstandingToMaskV3(
 
       const maximumRecoveredValue =
         sourceValue <
-          0.12
+          0.08
           ? Math.max(
               sourceValue,
               recoveredFloor *
@@ -12406,34 +12413,6 @@ export class SegmentationPostprocessorV2 {
           .cancellationSignal
       );
 
-      const maskTensorData =
-        convertTensorToFloat32(
-          masksTensor,
-          requestId
-        );
-
-      if (
-        maskTensorData.length ===
-        0
-      ) {
-        throw new SegmentationError(
-          'INVALID_DECODER_OUTPUT',
-          'EdgeSAM returned an empty mask tensor.',
-          {
-            requestId,
-
-            component:
-              'decoder',
-
-            stage:
-              'read-mask-candidates',
-
-            retryable:
-              true,
-          }
-        );
-      }
-
       context
         .timings
         .readCandidatesMs =
@@ -12586,10 +12565,7 @@ export class SegmentationPostprocessorV2 {
         );
 
       workingMask =
-        cloneFloatMask(
-          croppedMask,
-          requestId
-        );
+        croppedMask;
 
       context
         .timings
@@ -12689,17 +12665,18 @@ export class SegmentationPostprocessorV2 {
       }
 
       /* =====================================================
-       * 9. Suppress background shadows
+       * 9. Preserve decoder evidence for V3
        * =================================================== */
 
-      workingMask =
-        suppressSoftBackgroundShadowsV2(
-          workingMask,
-          adaptiveThreshold,
-          requestId,
-          context
-            .cancellationSignal
-        );
+      /*
+       * Do not suppress low-confidence mask values before
+       * image/background understanding.
+       *
+       * Thin clothing edges, trouser legs, shoe soles and
+       * laces can legitimately have lower decoder confidence.
+       * BackgroundUnderstandingV3 must see those pixels before
+       * any destructive suppression is allowed.
+       */
 
       assertNotCancelled(
         context
@@ -12716,8 +12693,8 @@ export class SegmentationPostprocessorV2 {
         'Running image-guided boundary refinement V3.'
       );
 
-      let v3RefinedReference:
-  SegmentationFloatMask;
+      let v3Succeeded =
+        false;
 
       try {
         workingMask =
@@ -12728,6 +12705,9 @@ export class SegmentationPostprocessorV2 {
               .threshold,
             context
           );
+
+        v3Succeeded =
+          true;
       } catch (error) {
         if (
           isSegmentationError(
@@ -12751,17 +12731,8 @@ export class SegmentationPostprocessorV2 {
         );
 
         workingMask =
-          cloneFloatMask(
-            croppedMask,
-            requestId
-          );
+          croppedMask;
       }
-
-      v3RefinedReference =
-  cloneFloatMask(
-    workingMask,
-    requestId
-  );
 
       assertNotCancelled(
         context
@@ -12772,118 +12743,51 @@ export class SegmentationPostprocessorV2 {
        * 11. V2 color-boundary fallback
        * =================================================== */
 
-      const imageGuidedModels =
-        createImageGuidedBoundaryModelsV2(
-          workingMask,
-          croppedImageAnalysis,
-          context
-            .cancellationSignal
-        );
-
-      const imageGuidedResult =
-        refineBoundaryUsingImageGuidanceV2(
-          workingMask,
-          croppedImageAnalysis,
-          imageGuidedModels,
-          context
-            .cancellationSignal
-        );
-
-      appendUniqueWarnings(
-        context.warnings,
-        imageGuidedResult
-          .warnings
-      );
-
       if (
-  imageGuidedResult
-    .applied
-) {
-  const v2Mask =
-    imageGuidedResult
-      .mask;
+        !v3Succeeded
+      ) {
+        const imageGuidedModels =
+          createImageGuidedBoundaryModelsV2(
+            workingMask,
+            croppedImageAnalysis,
+            context
+              .cancellationSignal
+          );
 
-  const safelyMergedData =
-    new Float32Array(
-      workingMask
-        .data
-        .length
-    );
+        const imageGuidedResult =
+          refineBoundaryUsingImageGuidanceV2(
+            workingMask,
+            croppedImageAnalysis,
+            imageGuidedModels,
+            context
+              .cancellationSignal
+          );
 
-  const interiorThreshold =
-    Math.max(
-      0.62,
-      adaptiveThreshold
-        .threshold +
-        0.14
-    );
-
-  for (
-    let index = 0;
-    index <
-      safelyMergedData.length;
-    index += 1
-  ) {
-    if (
-      (
-        index &
-        131071
-      ) ===
-      0
-    ) {
-      assertNotCancelled(
-        context
-          .cancellationSignal
-      );
-    }
-
-    const v3Value =
-      workingMask
-        .data[
-          index
-        ];
-
-    const v2Value =
-      v2Mask
-        .data[
-          index
-        ];
-
-    /*
-     * V3 هي النتيجة الأساسية.
-     *
-     * V2 مسموح لها فقط بحذف تسريب إضافي،
-     * وممنوع عليها إعادة أي Background
-     * سبق أن أزالته V3.
-     */
-    if (
-      v3Value >=
-        interiorThreshold
-    ) {
-      safelyMergedData[
-        index
-      ] =
-        v3Value;
-    } else {
-      safelyMergedData[
-        index
-      ] =
-        Math.min(
-          v3Value,
-          v2Value
+        appendUniqueWarnings(
+          context.warnings,
+          imageGuidedResult
+            .warnings
         );
-    }
-  }
 
-  workingMask =
-    createFloatMask(
-      workingMask.width,
-      workingMask.height,
-      safelyMergedData,
-      requestId,
-      'refine-alpha-mask'
-    );
-}
+        if (
+          imageGuidedResult
+            .applied
+        ) {
+          workingMask =
+            imageGuidedResult
+              .mask;
+        }
+      }
+
+      /*
+       * Preserve the strongest refined mask before later
+       * cleanup/morphology so thin valid details can recover.
+       */
+      const v3RefinedReference =
+        cloneFloatMask(
+          workingMask,
+          requestId
+        );
 
       assertNotCancelled(
         context
@@ -13272,17 +13176,15 @@ export class SegmentationPostprocessorV2 {
             .cancellationSignal
         );
 
-      /* =====================================================
-       * 21. Matte polish
-       * =================================================== */
-
-      workingMask =
-        polishMatteV2(
-          workingMask,
-          requestId,
-          context
-            .cancellationSignal
-        );
+      /*
+       * Pre-restore matte polish removed.
+       *
+       * The final polish after restore + edge protection
+       * remains authoritative. Avoiding this earlier pass
+       * saves a full Float32 mask allocation and full-image
+       * pixel traversal, while also avoiding sharpening the
+       * matte before bilinear restoration.
+       */
 
       assertNotCancelled(
         context

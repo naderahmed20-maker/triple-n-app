@@ -46,7 +46,7 @@ const CAPTURED_TEMPLATE_IMAGE_KEY =
  * أبعاد إطار الكاميرا الأصلية.
  */
 const MAX_OUTPUT_SIDE =
-  1600;
+  1280;
 
 /* =========================================================
  * Types
@@ -688,7 +688,7 @@ export default function TemplatePreviewScreen() {
                   format:
                     ImageManipulator
                       .SaveFormat
-                      .PNG,
+                      .JPEG,
                 }
               );
 

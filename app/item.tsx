@@ -55,12 +55,12 @@ import {
 
 import {
   detectColorFromImage,
-} from './data/colorDetector';
+} from '../data/colorDetector';
 
 import {
   FashionColor,
   fashionColors,
-} from './data/fashionColors';
+} from '../data/fashionColors';
 
 import {
   CLOTHING_CATEGORIES,
@@ -68,7 +68,7 @@ import {
   SHOES_TYPES,
   TOP_TYPES,
   WardrobeType,
-} from './data/clothingCategories';
+} from '../data/clothingCategories';
 
 import {
   pauseScanItemProcessingQueue,

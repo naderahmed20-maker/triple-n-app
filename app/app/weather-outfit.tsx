@@ -42,22 +42,22 @@ import {
   loadTemperatureUnit,
   loadWeatherContext,
   type TemperatureUnit,
-} from '../data/appContext';
+} from '../../data/appContext';
 
 import {
   type FashionEngineResult,
   type FashionItem,
   pickWeatherFashionOutfit,
   type ScoredFashionOutfit,
-} from '../data/fashionEngine';
+} from '../../data/fashionEngine';
 
 import {
   type SeasonType,
   type StyleType,
   type WeatherType,
-} from '../data/fashionRules';
+} from '../../data/fashionRules';
 
-import OutfitCanvas from './components/OutfitCanvas';
+import OutfitCanvas from '../../components/triple-n/OutfitCanvas';
 
 const SETTINGS_KEY =
   'TRIPLE_N_SETTINGS';
@@ -239,7 +239,31 @@ const isItalian =
             );
 
           const wardrobeItems =
-            wardrobe as FashionItem[];
+            wardrobe
+              .filter(
+                item =>
+                  !item.processing_status ||
+                  item.processing_status ===
+                    'ready'
+              )
+              .map(
+                item => ({
+                  ...item,
+
+                  /*
+                   * Outfit generation must use the final
+                   * cleaned image when processing succeeded.
+                   *
+                   * category / subCategory / name / color
+                   * remain untouched.
+                   */
+                  image:
+                    item
+                      .cleaned_image_path
+                      ?.trim() ||
+                    item.image,
+                })
+              ) as FashionItem[];
 
           setItems(
             wardrobeItems

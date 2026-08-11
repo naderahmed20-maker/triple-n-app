@@ -30,7 +30,7 @@ import {
   View,
 } from 'react-native';
 
-import OutfitCanvas from './app/components/OutfitCanvas';
+import OutfitCanvas from '../components/triple-n/OutfitCanvas';
 
 type WardrobeItem = {
   id?: string;

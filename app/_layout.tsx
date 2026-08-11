@@ -46,6 +46,10 @@ import {
 } from '@/lib/i18n';
 
 import {
+  checkSubscriptionAccess,
+} from '@/lib/subscriptionService';
+
+import {
   supabase,
 } from '@/lib/supabase';
 
@@ -98,19 +102,17 @@ type DeviceGateResult = {
  * ======================================================= */
 
 /**
- * Ø§Ù„Ø­Ø¯ Ø§Ù„Ø£Ø¯Ù†Ù‰ Ø§Ù„Ø¢Ù…Ù† Ù„ØªØ´ØºÙŠÙ„ EdgeSAM Ù…Ø­Ù„ÙŠÙ‹Ø§.
+ * الحد الأدنى الآمن المبلغ عنه لتشغيل EdgeSAM محليًا.
  *
- * Device.totalMemory Ù‚Ø¯ ÙŠØ¹Ø±Ø¶ Ù‚ÙŠÙ…Ø© Ø£Ù‚Ù„ Ù‚Ù„ÙŠÙ„Ù‹Ø§
- * Ù…Ù† Ø§Ù„Ø±Ù‚Ù… Ø§Ù„ØªØ¬Ø§Ø±ÙŠ Ø§Ù„Ù…ÙƒØªÙˆØ¨ Ø¹Ù„Ù‰ Ø§Ù„Ø¬Ù‡Ø§Ø².
- *
- * Ù„Ø°Ù„Ùƒ Ù‡Ø°Ø§ Ø§Ù„Ø­Ø¯ ÙŠØ³Ù…Ø­ Ù„Ù„Ø£Ø¬Ù‡Ø²Ø© Ù…Ù† ÙØ¦Ø© 4 GB
- * Ø£Ùˆ Ø£Ø¹Ù„Ù‰ Ø¨Ø§Ù„Ù…Ø±ÙˆØ± Ø¨ØµÙˆØ±Ø© Ø¢Ù…Ù†Ø©.
+ * Device.totalMemory قد يعرض قيمة أقل قليلًا من الرقم
+ * التجاري المكتوب على الجهاز، لذلك أجهزة فئة 4 GB
+ * يمكنها المرور بصورة آمنة.
  */
 const MINIMUM_REPORTED_RAM_BYTES =
   3 * 1024 * 1024 * 1024;
 
 /**
- * Ø§Ù„Ù‚ÙŠÙ…Ø© Ø§Ù„Ù…ÙØ¶Ù„Ø© ÙˆÙ„ÙŠØ³Øª Ø´Ø±Ø· Ù…Ù†Ø¹ Ø¥Ø¶Ø§ÙÙŠÙ‹Ø§.
+ * القيمة المفضلة وليست شرط منع إضافيًا.
  */
 const RECOMMENDED_RAM_BYTES =
   4 * 1024 * 1024 * 1024;
@@ -193,10 +195,6 @@ function formatGigabytes(
 
 function isExpoGo():
   boolean {
-  /**
-   * storeClient ÙŠØ¹Ù†ÙŠ Ø£Ù† Ø§Ù„ØªØ·Ø¨ÙŠÙ‚ ÙŠØ¹Ù…Ù„
-   * Ø¯Ø§Ø®Ù„ Expo Go ÙˆÙ„ÙŠØ³ Development Build.
-   */
   return (
     Constants
       .executionEnvironment ===
@@ -224,10 +222,6 @@ async function checkDeviceCompatibility():
     Date.now();
 
   try {
-    /* -----------------------------------------------------
-     * Web is not supported
-     * --------------------------------------------------- */
-
     if (
       Platform.OS ===
       'web'
@@ -258,10 +252,6 @@ async function checkDeviceCompatibility():
       };
     }
 
-    /* -----------------------------------------------------
-     * Only iOS and Android
-     * --------------------------------------------------- */
-
     if (
       !isSupportedNativePlatform()
     ) {
@@ -290,10 +280,6 @@ async function checkDeviceCompatibility():
         checkedAt,
       };
     }
-
-    /* -----------------------------------------------------
-     * Expo Go cannot load native ONNX modules
-     * --------------------------------------------------- */
 
     if (
       isExpoGo()
@@ -326,10 +312,6 @@ async function checkDeviceCompatibility():
       };
     }
 
-    /* -----------------------------------------------------
-     * Physical device required
-     * --------------------------------------------------- */
-
     if (
       !Device.isDevice
     ) {
@@ -360,10 +342,6 @@ async function checkDeviceCompatibility():
         checkedAt,
       };
     }
-
-    /* -----------------------------------------------------
-     * RAM gate
-     * --------------------------------------------------- */
 
     const totalMemoryBytes =
       typeof Device.totalMemory ===
@@ -417,10 +395,6 @@ async function checkDeviceCompatibility():
         checkedAt,
       };
     }
-
-    /* -----------------------------------------------------
-     * Supported
-     * --------------------------------------------------- */
 
     return {
       status:
@@ -536,7 +510,7 @@ function StartupLoadingScreen() {
           styles.loadingMessage
         }
       >
-        Checking device security and account session.
+        Checking device security, account session and subscription access.
       </Text>
     </View>
   );
@@ -793,6 +767,20 @@ function RootNavigationStack() {
         />
 
         <Stack.Screen
+          name="payment"
+          options={{
+            gestureEnabled:
+              false,
+
+            fullScreenGestureEnabled:
+              false,
+
+            animation:
+              'fade',
+          }}
+        />
+
+        <Stack.Screen
           name="(tabs)"
           options={{
             gestureEnabled:
@@ -873,12 +861,12 @@ function RootNavigationStack() {
         />
 
         <Stack.Screen
-  name="report-problem"
-  options={{
-    headerShown:
-      false,
-  }}
-/>
+          name="report-problem"
+          options={{
+            headerShown:
+              false,
+          }}
+        />
 
         <Stack.Screen
           name="about"
@@ -951,6 +939,7 @@ function RootNavigationStack() {
     </ThemeProvider>
   );
 }
+
 /* =========================================================
  * Root layout
  * ======================================================= */
@@ -969,18 +958,17 @@ export default function RootLayout() {
       true
     );
 
-  
   const scanProcessingInitializedRef =
-  useRef(
-    false
-  );
+    useRef(
+      false
+    );
 
-const scanProcessingInitializationPromiseRef =
-  useRef<
-    Promise<void> | null
-  >(
-    null
-  );
+  const scanProcessingInitializationPromiseRef =
+    useRef<
+      Promise<void> | null
+    >(
+      null
+    );
 
   const [
     deviceGate,
@@ -1009,6 +997,24 @@ const scanProcessingInitializationPromiseRef =
   const [
     hasSession,
     setHasSession,
+  ] =
+    useState<
+      boolean | null
+    >(
+      null
+    );
+
+  const [
+    subscriptionReady,
+    setSubscriptionReady,
+  ] =
+    useState(
+      false
+    );
+
+  const [
+    hasSubscriptionAccess,
+    setHasSubscriptionAccess,
   ] =
     useState<
       boolean | null
@@ -1073,69 +1079,76 @@ const scanProcessingInitializationPromiseRef =
     );
 
   useEffect(() => {
-    console.log('STARTUP: device check effect started', Date.now());
+    console.log(
+      'STARTUP: device check effect started',
+      Date.now()
+    );
+
     void runDeviceCheck(
       false
     ).then(() => {
-      console.log('STARTUP: device check completed', Date.now());
+      console.log(
+        'STARTUP: device check completed',
+        Date.now()
+      );
     });
   }, [
     runDeviceCheck,
   ]);
 
   /* =======================================================
- * Scan processing disposal
- * ===================================================== */
+   * Scan processing disposal
+   * ===================================================== */
 
-const disposeScanProcessing =
-  useCallback(
-    async () => {
-      scanProcessingInitializedRef
-        .current =
-        false;
+  const disposeScanProcessing =
+    useCallback(
+      async () => {
+        scanProcessingInitializedRef
+          .current =
+          false;
 
-      scanProcessingInitializationPromiseRef
-        .current =
-        null;
+        scanProcessingInitializationPromiseRef
+          .current =
+          null;
 
-      const results =
-        await Promise.allSettled([
-          import(
-            '@/scan/core/background'
-          ).then(
-            async module => {
-              await module
-                .disposeScanItemBackgroundProcessing();
-            }
-          ),
+        const results =
+          await Promise.allSettled([
+            import(
+              '@/scan/core/background'
+            ).then(
+              async module => {
+                await module
+                  .disposeScanItemBackgroundProcessing();
+              }
+            ),
 
-          import(
-            '@/scan/core/ai/SegmentationEngine'
-          ).then(
-            async module => {
-              await module
-                .disposeSharedSegmentationEngine();
-            }
-          ),
-        ]);
+            import(
+              '@/scan/core/ai/SegmentationEngine'
+            ).then(
+              async module => {
+                await module
+                  .disposeSharedSegmentationEngine();
+              }
+            ),
+          ]);
 
-      for (
-        const result of
-        results
-      ) {
-        if (
-          result.status ===
-            'rejected'
+        for (
+          const result of
+          results
         ) {
-          console.log(
-            'SCAN PROCESSING DISPOSE ERROR:',
-            result.reason
-          );
+          if (
+            result.status ===
+              'rejected'
+          ) {
+            console.log(
+              'SCAN PROCESSING DISPOSE ERROR:',
+              result.reason
+            );
+          }
         }
-      }
-    },
-    []
-  );
+      },
+      []
+    );
 
   /* =======================================================
    * Supabase session
@@ -1154,7 +1167,11 @@ const disposeScanProcessing =
 
     async function loadSession():
       Promise<void> {
-      console.log('STARTUP: session load started', Date.now());
+      console.log(
+        'STARTUP: session load started',
+        Date.now()
+      );
+
       try {
         const {
           data,
@@ -1200,7 +1217,11 @@ const disposeScanProcessing =
           active &&
           mountedRef.current
         ) {
-          console.log('STARTUP: session load finished', Date.now());
+          console.log(
+            'STARTUP: session load finished',
+            Date.now()
+          );
+
           setSessionReady(
             true
           );
@@ -1241,6 +1262,18 @@ const disposeScanProcessing =
             );
 
             if (
+              !authenticated
+            ) {
+              setSubscriptionReady(
+                false
+              );
+
+              setHasSubscriptionAccess(
+                null
+              );
+            }
+
+            if (
               event ===
                 'SIGNED_OUT' ||
               !authenticated
@@ -1263,258 +1296,427 @@ const disposeScanProcessing =
     disposeScanProcessing,
   ]);
 
-/* =======================================================
- * Scan Item foreground processing initialization
- * ===================================================== */
+  /* =======================================================
+   * Subscription access
+   * ===================================================== */
 
-useEffect(() => {
+  useEffect(() => {
+    if (
+      deviceGate.status !==
+        'supported' ||
+      !sessionReady
+    ) {
+      return;
+    }
+
+    let active =
+      true;
+
+    async function loadSubscriptionAccess():
+      Promise<void> {
+      if (
+        !hasSession
+      ) {
+        if (
+          active &&
+          mountedRef.current
+        ) {
+          setHasSubscriptionAccess(
+            null
+          );
+
+          setSubscriptionReady(
+            true
+          );
+        }
+
+        return;
+      }
+
+      setSubscriptionReady(
+        false
+      );
+
+      try {
+        const {
+          data,
+          error,
+        } =
+          await supabase.auth
+            .getUser();
+
+        if (
+          error
+        ) {
+          throw error;
+        }
+
+        const user =
+          data.user;
+
+        if (
+          !user
+        ) {
+          throw new Error(
+            'Authenticated user could not be resolved.'
+          );
+        }
+
+        const result =
+          await checkSubscriptionAccess(
+            user.id
+          );
+
+        if (
+          !active ||
+          !mountedRef.current
+        ) {
+          return;
+        }
+
+        setHasSubscriptionAccess(
+          result.hasAccess
+        );
+
+        setSubscriptionReady(
+          true
+        );
+      } catch (error) {
+        console.log(
+          'SUBSCRIPTION ACCESS LOAD ERROR:',
+          error
+        );
+
+        if (
+          active &&
+          mountedRef.current
+        ) {
+          setHasSubscriptionAccess(
+            false
+          );
+
+          setSubscriptionReady(
+            true
+          );
+        }
+      }
+    }
+
+    void loadSubscriptionAccess();
+
+    return () => {
+      active =
+        false;
+    };
+  }, [
+    deviceGate.status,
+    sessionReady,
+    hasSession,
+    segments,
+  ]);
+
+  /* =======================================================
+   * Scan Item foreground processing initialization
+   * ===================================================== */
+
+ useEffect(() => {
+  /*
+   * ممنوع تحميل أو تهيئة نظام معالجة الصور
+   * قبل التأكد أن المستخدم لديه Subscription Access.
+   *
+   * النتيجة:
+   *
+   * Login
+   *   ↓
+   * Subscription check
+   *   ↓
+   * Payment screen إذا لم يوجد access
+   *   ↓
+   * لا EdgeSAM
+   *   ↓
+   * لا SegmentationEngine
+   *   ↓
+   * لا Scan Processing initialization
+   *
+   * وبعد الحصول على access فقط:
+   *
+   * Home
+   *   ↓
+   * Scan Processing يصبح مسموحًا بالتهيئة.
+   */
   if (
     deviceGate.status !==
       'supported' ||
     !sessionReady ||
-    !hasSession
+    !hasSession ||
+    !subscriptionReady ||
+    hasSubscriptionAccess !==
+      true
   ) {
     return;
   }
 
-  let active =
-    true;
+    let active =
+      true;
 
-  async function initializeScanProcessingSystem():
-    Promise<void> {
-    if (
-      scanProcessingInitializedRef
-        .current
-    ) {
-      return;
-    }
+    async function initializeScanProcessingSystem():
+      Promise<void> {
+      if (
+        scanProcessingInitializedRef
+          .current
+      ) {
+        return;
+      }
 
-    if (
-      scanProcessingInitializationPromiseRef
-        .current
-    ) {
-      await scanProcessingInitializationPromiseRef
-        .current;
-
-      return;
-    }
-
-    const initializationPromise =
-      (
-        async () => {
-          const [
-  processingModule,
-  wardrobeModule,
-  storageModule,
-] =
-  await Promise.all([
-    import(
-      '@/scan/core/background'
-    ),
-
-    import(
-      '@/lib/wardrobeService'
-    ),
-
-    import(
-      '@/lib/storageService'
-    ),
-  ]);
-
-          if (
-            !active ||
-            !mountedRef.current
-          ) {
-            return;
-          }
-
-          await processingModule
-            .initializeScanItemBackgroundProcessing({
-             updateWardrobeItem:
-  async input => {
-    const user =
-      await wardrobeModule
-        .getCurrentUser();
-
-    if (
-      !user
-    ) {
-      throw new Error(
-        'The authenticated user is unavailable while saving the processed image.'
-      );
-    }
-
-    /*
-     * processedImageUri هنا file:// محلي.
-     *
-     * نرفعه أولًا إلى Supabase Storage،
-     * ثم نحفظ الرابط الدائم فقط في قاعدة البيانات.
-     */
-    const uploadedProcessedImage =
-      await storageModule
-        .uploadWardrobeImage(
-          input
-            .processedImageUri,
-          user.id
-        );
-
-    if (
-      !uploadedProcessedImage ||
-      !uploadedProcessedImage
-        .trim()
-    ) {
-      throw new Error(
-        'The processed wardrobe image upload returned an empty URL.'
-      );
-    }
-
-    await wardrobeModule
-      .updateWardrobeItem(
-        input
-          .wardrobeItemId,
-        {
-          image:
-            uploadedProcessedImage,
-
-          /*
-           * لا نحفظ originalImageUri لأنها أيضًا
-           * file:// محلية وقد تختفي بعد Build جديد.
-           *
-           * نحتفظ بالرابط الدائم الناتج حتى لا تصبح
-           * القطعة فارغة بعد إعادة تثبيت التطبيق.
-           */
-          original_image_path:
-            uploadedProcessedImage,
-
-          cleaned_image_path:
-            uploadedProcessedImage,
-
-          processing_status:
-            'ready',
-
-          processing_error:
-            null,
-
-          processing_finished_at:
-            new Date()
-              .toISOString(),
-        }
-      );
-
-    return {
-      updated:
-        true,
-
-      metadata: {
-        processedLocally:
-          true,
-
-        uploadedRemotely:
-          true,
-
-        width:
-          input.width,
-
-        height:
-          input.height,
-
-        category:
-          input.category,
-
-        subcategory:
-          input.subcategory,
-
-        wardrobeType:
-          input
-            .wardrobeType,
-      },
-    };
-  },
-
-              transparentImageQuality:
-                100,
-
-              collectSegmentationDiagnostics:
-                false,
-
-              reuseSegmentationSession:
-                true,
-
-              processedFileNamePrefix:
-                'scan-item-queue',
-
-              /*
-               * تشغيل Queue مسموح أثناء فتح التطبيق.
-               */
-              autoStartQueue:
-                true,
-
-              /*
-               * ممنوع طلب أي تنفيذ بعد إغلاق التطبيق.
-               */
-              autoStartBackgroundProcessing:
-                false,
-
-              enableDebugLogs:
-                __DEV__,
-            });
-
-          if (
-            active &&
-            mountedRef.current
-          ) {
-            scanProcessingInitializedRef
-              .current =
-              true;
-          }
-        }
-      )();
-
-    scanProcessingInitializationPromiseRef
-      .current =
-        initializationPromise;
-
-    try {
-      await initializationPromise;
-    } finally {
       if (
         scanProcessingInitializationPromiseRef
-          .current ===
-        initializationPromise
+          .current
       ) {
-        scanProcessingInitializationPromiseRef
-          .current =
-          null;
+        await scanProcessingInitializationPromiseRef
+          .current;
+
+        return;
+      }
+
+      const initializationPromise =
+        (
+          async () => {
+            const [
+              processingModule,
+              wardrobeModule,
+              storageModule,
+            ] =
+              await Promise.all([
+                import(
+                  '@/scan/core/background'
+                ),
+
+                import(
+                  '@/lib/wardrobeService'
+                ),
+
+                import(
+                  '@/lib/storageService'
+                ),
+              ]);
+
+            if (
+              !active ||
+              !mountedRef.current
+            ) {
+              return;
+            }
+
+            await processingModule
+              .initializeScanItemBackgroundProcessing({
+                updateWardrobeItem:
+                  async input => {
+                    const user =
+                      await wardrobeModule
+                        .getCurrentUser();
+
+                    if (
+                      !user
+                    ) {
+                      throw new Error(
+                        'The authenticated user is unavailable while saving the processed image.'
+                      );
+                    }
+
+                    /*
+                     * processedImageUri هنا file:// محلي.
+                     *
+                     * نرفعه أولًا إلى Supabase Storage،
+                     * ثم نحفظ الرابط الدائم فقط في قاعدة البيانات.
+                     */
+                    const uploadedProcessedImage =
+                      await storageModule
+                        .uploadWardrobeImage(
+                          input
+                            .processedImageUri,
+                          user.id
+                        );
+
+                    if (
+                      !uploadedProcessedImage ||
+                      !uploadedProcessedImage
+                        .trim()
+                    ) {
+                      throw new Error(
+                        'The processed wardrobe image upload returned an empty URL.'
+                      );
+                    }
+
+                    await wardrobeModule
+                      .updateWardrobeItem(
+                        input
+                          .wardrobeItemId,
+                        {
+                          image:
+                            uploadedProcessedImage,
+
+                          /*
+                           * لا نحفظ originalImageUri لأنها file:// محلية
+                           * وقد تختفي بعد Build جديد.
+                           */
+                          cleaned_image_path:
+                            uploadedProcessedImage,
+
+                          processing_status:
+                            'ready',
+
+                          processing_error:
+                            null,
+
+                          processing_finished_at:
+                            new Date()
+                              .toISOString(),
+                        }
+                      );
+
+                    return {
+                      updated:
+                        true,
+
+                      metadata: {
+                        processedLocally:
+                          true,
+
+                        uploadedRemotely:
+                          true,
+
+                        width:
+                          input.width,
+
+                        height:
+                          input.height,
+
+                        category:
+                          input.category,
+
+                        subcategory:
+                          input.subcategory,
+
+                        wardrobeType:
+                          input
+                            .wardrobeType,
+                      },
+                    };
+                  },
+
+                transparentImageQuality:
+                  100,
+
+                collectSegmentationDiagnostics:
+                  false,
+
+                reuseSegmentationSession:
+                  true,
+
+                processedFileNamePrefix:
+                  'scan-item-queue',
+
+                /*
+                 * تشغيل Queue مسموح أثناء فتح التطبيق.
+                 */
+                autoStartQueue:
+                  false,
+
+                /*
+                 * ممنوع طلب أي تنفيذ بعد إغلاق التطبيق.
+                 */
+                autoStartBackgroundProcessing:
+                  false,
+
+                enableDebugLogs:
+                  false,
+              });
+
+            if (
+              active &&
+              mountedRef.current
+            ) {
+              scanProcessingInitializedRef
+                .current =
+                true;
+            }
+          }
+        )();
+
+      scanProcessingInitializationPromiseRef
+        .current =
+        initializationPromise;
+
+      try {
+        await initializationPromise;
+      } finally {
+        if (
+          scanProcessingInitializationPromiseRef
+            .current ===
+          initializationPromise
+        ) {
+          scanProcessingInitializationPromiseRef
+            .current =
+            null;
+        }
       }
     }
-  }
 
-  void initializeScanProcessingSystem()
-    .catch(
-      error => {
-        scanProcessingInitializedRef
-          .current =
-          false;
+    void initializeScanProcessingSystem()
+      .catch(
+        error => {
+          scanProcessingInitializedRef
+            .current =
+            false;
 
-        console.log(
-          'SCAN ITEM PROCESSING INITIALIZATION ERROR:',
-          error
-        );
-      }
-    );
+          console.log(
+            'SCAN ITEM PROCESSING INITIALIZATION ERROR:',
+            error
+          );
+        }
+      );
 
-  return () => {
-    active =
-      false;
-  };
-}, [
+    return () => {
+      active =
+        false;
+    };
+  }, [
   deviceGate.status,
   sessionReady,
   hasSession,
+  subscriptionReady,
+  hasSubscriptionAccess,
+]);
+
+/* =======================================================
+ * Dispose Scan Processing when subscription access is lost
+ * ===================================================== */
+
+useEffect(() => {
+  if (
+    !sessionReady ||
+    !subscriptionReady
+  ) {
+    return;
+  }
+
+  if (
+    !hasSession ||
+    hasSubscriptionAccess !==
+      true
+  ) {
+    void disposeScanProcessing();
+  }
+}, [
+  sessionReady,
+  subscriptionReady,
+  hasSession,
+  hasSubscriptionAccess,
+  disposeScanProcessing,
 ]);
 
   /* =======================================================
-   * Authentication navigation guard
+   * Authentication + subscription navigation guard
    * ===================================================== */
 
   useEffect(() => {
@@ -1537,29 +1739,74 @@ useEffect(() => {
       firstSegment ===
         'signup';
 
+    const inPaymentScreen =
+      firstSegment ===
+        'payment';
+
+    /*
+     * لا يوجد مستخدم مسجل.
+     */
     if (
-      !hasSession &&
-      !inAuthScreen
+      !hasSession
     ) {
-      router.replace(
-        '/login' as never
-      );
+      if (
+        !inAuthScreen
+      ) {
+        router.replace(
+          '/login' as never
+        );
+      }
 
       return;
     }
 
+    /*
+     * يوجد مستخدم، لكن فحص الاشتراك لم ينته بعد.
+     */
     if (
-      hasSession &&
-      inAuthScreen
+      !subscriptionReady ||
+      hasSubscriptionAccess ===
+        null
+    ) {
+      return;
+    }
+
+    /*
+     * المستخدم لديه اشتراك صالح،
+     * أو Development Access مؤقت.
+     */
+    if (
+      hasSubscriptionAccess
+    ) {
+      if (
+        inAuthScreen ||
+        inPaymentScreen
+      ) {
+        router.replace(
+          '/home' as never
+        );
+      }
+
+      return;
+    }
+
+    /*
+     * المستخدم مسجل الدخول ولكن ليس لديه
+     * وصول صالح: صفحة الدفع إجبارية.
+     */
+    if (
+      !inPaymentScreen
     ) {
       router.replace(
-        '/home' as never
+        '/payment' as never
       );
     }
   }, [
     deviceGate.status,
     sessionReady,
     hasSession,
+    subscriptionReady,
+    hasSubscriptionAccess,
     segments,
   ]);
 
@@ -1612,7 +1859,11 @@ useEffect(() => {
   if (
     !sessionReady ||
     hasSession ===
-      null
+      null ||
+    (
+      hasSession &&
+      !subscriptionReady
+    )
   ) {
     return (
       <TranslationProvider>
@@ -1631,6 +1882,7 @@ useEffect(() => {
     </TranslationProvider>
   );
 }
+
 /* =========================================================
  * Styles
  * ======================================================= */

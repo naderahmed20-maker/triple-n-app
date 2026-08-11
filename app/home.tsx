@@ -44,10 +44,10 @@ import {
   loadWeatherContext,
   saveWeatherContext,
   type TemperatureUnit,
-} from './data/appContext';
+} from '../data/appContext';
 import {
   WARDROBE_TYPE_KEY,
-} from './data/clothingCategories';
+} from '../data/clothingCategories';
 const SUMMER_SEASON =
   'Summer';
 type SummerWeather =

@@ -500,6 +500,357 @@ function resizeAlphaMask(
   };
 }
 
+type TightAlphaBounds = {
+  left: number;
+
+  top: number;
+
+  width: number;
+
+  height: number;
+};
+
+/**
+ * Alpha صغير جدًا قد يكون مجرد anti-aliasing أو noise.
+ * القيمة منخفضة بما يكفي للحفاظ على الحواف الحقيقية،
+ * مع تجاهل البكسلات الشفافة شبه الكاملة البعيدة.
+ */
+const TIGHT_ALPHA_THRESHOLD =
+  8;
+
+/**
+ * نحتفظ بمساحة شفافة صغيرة حول القطعة حتى لا تلتصق
+ * الحواف بإطار الصورة ولا يتم قطع الـsoft edges.
+ */
+const TIGHT_ALPHA_PADDING_RATIO =
+  0.02;
+
+const TIGHT_ALPHA_MIN_PADDING =
+  6;
+
+const TIGHT_ALPHA_MAX_PADDING =
+  32;
+
+function findTightAlphaBounds(
+  mask: AlphaMask
+): TightAlphaBounds {
+  let minimumX =
+    mask.width;
+
+  let minimumY =
+    mask.height;
+
+  let maximumX =
+    -1;
+
+  let maximumY =
+    -1;
+
+  for (
+    let y = 0;
+    y < mask.height;
+    y += 1
+  ) {
+    const rowOffset =
+      y *
+      mask.width;
+
+    for (
+      let x = 0;
+      x < mask.width;
+      x += 1
+    ) {
+      const alpha =
+        mask.data[
+          rowOffset +
+          x
+        ];
+
+      if (
+        alpha <
+        TIGHT_ALPHA_THRESHOLD
+      ) {
+        continue;
+      }
+
+      if (
+        x <
+        minimumX
+      ) {
+        minimumX =
+          x;
+      }
+
+      if (
+        x >
+        maximumX
+      ) {
+        maximumX =
+          x;
+      }
+
+      if (
+        y <
+        minimumY
+      ) {
+        minimumY =
+          y;
+      }
+
+      if (
+        y >
+        maximumY
+      ) {
+        maximumY =
+          y;
+      }
+    }
+  }
+
+  /**
+   * Safety fallback:
+   * لو الـMask لا تحتوي بكسلات مرئية،
+   * نحتفظ بالأبعاد الأصلية ولا نكسر التصدير.
+   */
+  if (
+    maximumX <
+      minimumX ||
+    maximumY <
+      minimumY
+  ) {
+    return {
+      left:
+        0,
+
+      top:
+        0,
+
+      width:
+        mask.width,
+
+      height:
+        mask.height,
+    };
+  }
+
+  const rawWidth =
+    maximumX -
+    minimumX +
+    1;
+
+  const rawHeight =
+    maximumY -
+    minimumY +
+    1;
+
+  const padding =
+    clamp(
+      Math.round(
+        Math.max(
+          rawWidth,
+          rawHeight
+        ) *
+          TIGHT_ALPHA_PADDING_RATIO
+      ),
+      TIGHT_ALPHA_MIN_PADDING,
+      TIGHT_ALPHA_MAX_PADDING
+    );
+
+  const left =
+    Math.max(
+      0,
+      minimumX -
+        padding
+    );
+
+  const top =
+    Math.max(
+      0,
+      minimumY -
+        padding
+    );
+
+  const right =
+    Math.min(
+      mask.width -
+        1,
+      maximumX +
+        padding
+    );
+
+  const bottom =
+    Math.min(
+      mask.height -
+        1,
+      maximumY +
+        padding
+    );
+
+  return {
+    left,
+
+    top,
+
+    width:
+      right -
+      left +
+      1,
+
+    height:
+      bottom -
+      top +
+      1,
+  };
+}
+
+function cropRgbaPixels(
+  rgba: Uint8Array,
+  sourceWidth: number,
+  sourceHeight: number,
+  bounds: TightAlphaBounds
+) {
+  if (
+    bounds.left ===
+      0 &&
+    bounds.top ===
+      0 &&
+    bounds.width ===
+      sourceWidth &&
+    bounds.height ===
+      sourceHeight
+  ) {
+    return rgba;
+  }
+
+  const output =
+    new Uint8Array(
+      bounds.width *
+      bounds.height *
+      4
+    );
+
+  const sourceRowBytes =
+    sourceWidth *
+    4;
+
+  const targetRowBytes =
+    bounds.width *
+    4;
+
+  const sourceLeftBytes =
+    bounds.left *
+    4;
+
+  for (
+    let targetY = 0;
+    targetY <
+      bounds.height;
+    targetY += 1
+  ) {
+    const sourceY =
+      bounds.top +
+      targetY;
+
+    if (
+      sourceY <
+        0 ||
+      sourceY >=
+        sourceHeight
+    ) {
+      continue;
+    }
+
+    const sourceStart =
+      sourceY *
+        sourceRowBytes +
+      sourceLeftBytes;
+
+    const sourceEnd =
+      sourceStart +
+      targetRowBytes;
+
+    const targetStart =
+      targetY *
+      targetRowBytes;
+
+    output.set(
+      rgba.subarray(
+        sourceStart,
+        sourceEnd
+      ),
+      targetStart
+    );
+  }
+
+  return output;
+}
+
+function cropAlphaMask(
+  mask: AlphaMask,
+  bounds: TightAlphaBounds
+): AlphaMask {
+  if (
+    bounds.left ===
+      0 &&
+    bounds.top ===
+      0 &&
+    bounds.width ===
+      mask.width &&
+    bounds.height ===
+      mask.height
+  ) {
+    return mask;
+  }
+
+  const output =
+    new Uint8Array(
+      bounds.width *
+      bounds.height
+    );
+
+  for (
+    let targetY = 0;
+    targetY <
+      bounds.height;
+    targetY += 1
+  ) {
+    const sourceY =
+      bounds.top +
+      targetY;
+
+    const sourceStart =
+      sourceY *
+        mask.width +
+      bounds.left;
+
+    const sourceEnd =
+      sourceStart +
+      bounds.width;
+
+    const targetStart =
+      targetY *
+      bounds.width;
+
+    output.set(
+      mask.data.subarray(
+        sourceStart,
+        sourceEnd
+      ),
+      targetStart
+    );
+  }
+
+  return {
+    width:
+      bounds.width,
+
+    height:
+      bounds.height,
+
+    data:
+      output,
+  };
+}
 function sanitizeFileName(
   value: string
 ) {
@@ -613,11 +964,38 @@ export async function exportTransparentMask({
       loaded.height
     );
 
- const transparentRgba =
-  applyMaskToRgbaInPlace(
-    loaded.rgba,
-    resizedMask
-  );
+  /**
+   * مهم:
+   * الصور القديمة كانت تُصدر بنفس أبعاد الكاميرا كاملة،
+   * ولذلك كانت تحتوي على مساحة شفافة ضخمة حول الملابس.
+   *
+   * نحدد هنا حدود الجسم الفعلية من الـAlpha Mask أولًا،
+   * ثم نقص الـRGBA والـMask قبل إنشاء PNG.
+   */
+  const cropBounds =
+    findTightAlphaBounds(
+      resizedMask
+    );
+
+  const croppedRgba =
+    cropRgbaPixels(
+      loaded.rgba,
+      loaded.width,
+      loaded.height,
+      cropBounds
+    );
+
+  const croppedMask =
+    cropAlphaMask(
+      resizedMask,
+      cropBounds
+    );
+
+  const transparentRgba =
+    applyMaskToRgbaInPlace(
+      croppedRgba,
+      croppedMask
+    );
 
   const pixelData =
     Skia.Data.fromBytes(
@@ -628,10 +1006,10 @@ export async function exportTransparentMask({
     Skia.Image.MakeImage(
       {
         width:
-          loaded.width,
+          cropBounds.width,
 
         height:
-          loaded.height,
+          cropBounds.height,
 
         alphaType:
           AlphaType
@@ -642,9 +1020,8 @@ export async function exportTransparentMask({
             .RGBA_8888,
       },
       pixelData,
-      loaded.width * 4
+      cropBounds.width * 4
     );
-
   if (!image) {
     throw new Error(
       'Skia could not create the transparent image.'
@@ -714,10 +1091,10 @@ export async function exportTransparentMask({
         outputUri,
 
       width:
-        loaded.width,
+        cropBounds.width,
 
       height:
-        loaded.height,
+        cropBounds.height,
 
       sourceWidth:
         loaded.width,

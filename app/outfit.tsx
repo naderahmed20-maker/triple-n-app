@@ -28,13 +28,13 @@ import {
   getMyWardrobeItems,
 } from '@/lib/wardrobeService';
 
-import OutfitCanvas from './app/components/OutfitCanvas';
+import OutfitCanvas from '../components/triple-n/OutfitCanvas';
 
 import {
   Outfit,
   pickDifferentOutfit,
   WardrobeItem,
-} from './data/outfitRules';
+} from '../data/outfitRules';
 
 import {
   AppWeatherContext,
@@ -42,16 +42,16 @@ import {
   loadTemperatureUnit,
   loadWeatherContext,
   TemperatureUnit,
-} from './data/appContext';
+} from '../data/appContext';
 
 import {
   getAIScore,
-} from './data/aiScoring';
+} from '../data/aiScoring';
 
 import {
   getPreferenceBonus,
   getUserPreference,
-} from './data/userPreference';
+} from '../data/userPreference';
 
 type Occasion =
   | 'Casual'

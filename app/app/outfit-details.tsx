@@ -36,7 +36,7 @@ import {
   captureRef,
 } from 'react-native-view-shot';
 
-import OutfitCanvas from './components/OutfitCanvas';
+import OutfitCanvas from '../../components/triple-n/OutfitCanvas';
 
 type DetailedSavedOutfit =
   SavedOutfit & {
