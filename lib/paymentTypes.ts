@@ -1,9 +1,9 @@
 // lib/paymentTypes.ts
 
 import type {
-    PaymentProvider,
-    SubscriptionStatus,
-    TripleNPlanId,
+  PaymentProvider,
+  SubscriptionStatus,
+  TripleNPlanId,
 } from '@/lib/paymentConfig';
 
 /* =========================================================
@@ -28,9 +28,32 @@ export type PaymentCheckoutResult = {
   planId:
     TripleNPlanId | null;
 
+  /**
+   * Secure hosted checkout URL returned by the payment
+   * backend.
+   *
+   * For Stripe this is the Stripe Checkout Session URL.
+   */
+  checkoutUrl:
+    string | null;
+
+  /**
+   * Provider transaction / checkout-session identifier.
+   *
+   * Stripe:
+   * Checkout Session ID until the webhook records later
+   * invoice/payment identifiers.
+   */
   transactionId:
     string | null;
 
+  /**
+   * Provider subscription identifier when it is already
+   * available to the client.
+   *
+   * Stripe normally establishes the authoritative
+   * subscription ID through the webhook/backend.
+   */
   subscriptionId:
     string | null;
 
@@ -203,6 +226,9 @@ export const EMPTY_CHECKOUT_RESULT:
     null,
 
   planId:
+    null,
+
+  checkoutUrl:
     null,
 
   transactionId:

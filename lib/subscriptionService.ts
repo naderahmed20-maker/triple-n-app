@@ -21,12 +21,63 @@ import type {
     TripleNSubscription,
 } from '@/lib/paymentTypes';
 
+
 /* =========================================================
  * Storage
  * ======================================================= */
 
 const DEVELOPMENT_ACCESS_KEY =
   'TRIPLE_N_DEVELOPMENT_PAYMENT_ACCESS';
+
+  type SubscriptionAccessChangeListener =
+  (
+    hasAccess: boolean
+  ) => void;
+
+const subscriptionAccessChangeListeners =
+  new Set<
+    SubscriptionAccessChangeListener
+  >();
+
+function notifySubscriptionAccessChange(
+  hasAccess:
+    boolean
+): void {
+  for (
+    const listener of
+    subscriptionAccessChangeListeners
+  ) {
+    try {
+      listener(
+        hasAccess
+      );
+    } catch (
+      error
+    ) {
+      console.log(
+        'SUBSCRIPTION ACCESS LISTENER ERROR:',
+        error
+      );
+    }
+  }
+}
+
+export function subscribeToSubscriptionAccessChanges(
+  listener:
+    SubscriptionAccessChangeListener
+): () => void {
+  subscriptionAccessChangeListeners
+    .add(
+      listener
+    );
+
+  return () => {
+    subscriptionAccessChangeListeners
+      .delete(
+        listener
+      );
+  };
+}
 
 /* =========================================================
  * Database row
@@ -122,6 +173,10 @@ export async function grantDevelopmentPaymentAccess(
       record
     )
   );
+
+  notifySubscriptionAccessChange(
+  true
+);
 }
 
 /* =========================================================
@@ -176,6 +231,10 @@ export async function clearDevelopmentPaymentAccess():
   Promise<void> {
   await AsyncStorage.removeItem(
     DEVELOPMENT_ACCESS_KEY
+  );
+
+  notifySubscriptionAccessChange(
+    false
   );
 }
 

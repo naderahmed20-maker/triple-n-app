@@ -1,25 +1,25 @@
 // lib/paymentFlowService.ts
 
 import {
-    PAYMENT_ENVIRONMENT,
-    REAL_PAYMENTS_ENABLED,
-    type PaymentProvider,
-    type TripleNPlanId,
+  PAYMENT_ENVIRONMENT,
+  REAL_PAYMENTS_ENABLED,
+  type PaymentProvider,
+  type TripleNPlanId,
 } from '@/lib/paymentConfig';
 
 import {
-    isCheckoutCancelled,
-    isCheckoutPending,
-    isCheckoutSuccessful,
-    startCheckout,
+  isCheckoutCancelled,
+  isCheckoutPending,
+  isCheckoutSuccessful,
+  startCheckout,
 } from '@/lib/paymentService';
 
 import {
-    grantDevelopmentPaymentAccess,
+  grantDevelopmentPaymentAccess,
 } from '@/lib/subscriptionService';
 
 import type {
-    PaymentCheckoutResult,
+  PaymentCheckoutResult,
 } from '@/lib/paymentTypes';
 
 /* =========================================================
@@ -80,6 +80,42 @@ function isDevelopmentBypassCheckout():
 }
 
 /* =========================================================
+ * Failed checkout helper
+ * ======================================================= */
+
+function createFailedCheckout(
+  planId:
+    TripleNPlanId,
+  errorCode:
+    string,
+  errorMessage:
+    string
+): PaymentCheckoutResult {
+  return {
+    status:
+      'failed',
+
+    provider:
+      null,
+
+    planId,
+
+    checkoutUrl:
+      null,
+
+    transactionId:
+      null,
+
+    subscriptionId:
+      null,
+
+    errorCode,
+
+    errorMessage,
+  };
+}
+
+/* =========================================================
  * Main payment flow
  * ======================================================= */
 
@@ -91,32 +127,19 @@ export async function startPaymentFlow(
     input.userId
       .trim();
 
+  /* -------------------------------------------------------
+   * Authentication guard
+   * ----------------------------------------------------- */
+
   if (
     !userId
   ) {
-    const checkout:
-      PaymentCheckoutResult = {
-      status:
-        'failed',
-
-      provider:
-        null,
-
-      planId:
+    const checkout =
+      createFailedCheckout(
         input.planId,
-
-      transactionId:
-        null,
-
-      subscriptionId:
-        null,
-
-      errorCode:
         'AUTHENTICATED_USER_REQUIRED',
-
-      errorMessage:
-        'You must be signed in before continuing.',
-    };
+        'You must be signed in before continuing.'
+      );
 
     return {
       status:
@@ -265,7 +288,7 @@ export async function startPaymentFlow(
     }
 
     /* -----------------------------------------------------
-     * Development preview
+     * Development bypass
      * --------------------------------------------------- */
 
     const developmentBypass =
@@ -305,26 +328,23 @@ export async function startPaymentFlow(
     }
 
     /* -----------------------------------------------------
-     * REAL PAYMENT IMPORTANT
+     * Production payment
      * -----------------------------------------------------
      *
-     * نجاح checkout الحقيقي لوحده مش كفاية
-     * علشان نفتح التطبيق.
+     * A successful Stripe Checkout redirect does NOT by
+     * itself grant subscription access.
      *
-     * في Production:
+     * Stripe:
      *
-     * Stripe
-     *   -> server/webhook verification
+     * Checkout
+     *   -> Stripe webhook
+     *   -> Supabase subscriptions table
+     *   -> verified active subscription
      *
-     * Apple
-     *   -> verified transaction/subscription
+     * The backend remains the source of truth.
      *
-     * Google
-     *   -> verified purchase/subscription
-     *
-     * وبعدها backend هو اللي يثبت إن الاشتراك Active.
-     *
-     * لذلك لا نفتح التطبيق هنا مباشرة.
+     * Therefore the client remains pending here until
+     * subscription verification confirms access.
      * --------------------------------------------------- */
 
     return {
@@ -352,32 +372,20 @@ export async function startPaymentFlow(
         null,
     };
   } catch (
-    error: any
+    error:
+      unknown
   ) {
-    const checkout:
-      PaymentCheckoutResult = {
-      status:
-        'failed',
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : 'The payment flow failed unexpectedly.';
 
-      provider:
-        null,
-
-      planId:
+    const checkout =
+      createFailedCheckout(
         input.planId,
-
-      transactionId:
-        null,
-
-      subscriptionId:
-        null,
-
-      errorCode:
         'PAYMENT_FLOW_FAILED',
-
-      errorMessage:
-        error?.message ??
-        'The payment flow failed unexpectedly.',
-    };
+        errorMessage
+      );
 
     return {
       status:

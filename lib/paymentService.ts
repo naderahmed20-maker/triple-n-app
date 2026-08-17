@@ -1,192 +1,481 @@
 // lib/paymentService.ts
 
 import {
-    ALLOW_DEVELOPMENT_CONTINUE,
-    PAYMENT_ENVIRONMENT,
-    REAL_PAYMENTS_ENABLED,
-    type PaymentProvider,
-    type TripleNPlanId,
-} from '@/lib/paymentConfig';
-
-import {
-    resolveDevelopmentPaymentProvider,
-    resolvePaymentProvider,
-    type PaymentProviderCapabilityInput,
-} from '@/lib/paymentProviderResolver';
+  supabase,
+} from './supabase';
 
 import type {
-    PaymentCheckoutResult,
-    PaymentProviderResolution,
-    StartCheckoutInput,
-} from '@/lib/paymentTypes';
+  PaymentProvider,
+  TripleNPlanId,
+} from './paymentConfig';
+
+import type {
+  PaymentCheckoutResult,
+  StartCheckoutInput,
+} from './paymentTypes';
 
 /* =========================================================
- * Checkout request
+ * Triple N Payment Service
+ *
+ * Production responsibilities:
+ *
+ * - Authenticate with Supabase.
+ * - Call the secure Supabase Edge Function.
+ * - Never expose Stripe secret keys in the app.
+ * - Never trust prices supplied by the app.
+ * - Receive a Stripe-hosted Checkout URL.
+ *
+ * IMPORTANT:
+ *
+ * A created Checkout Session is NOT proof of payment.
+ *
+ * Real subscription access must only be granted after the
+ * Stripe webhook has verified and synchronized the
+ * subscription into Supabase.
  * ======================================================= */
 
-export type TripleNCheckoutRequest = {
-  userId:
+/* =========================================================
+ * Types
+ * ======================================================= */
+
+export type CreateCheckoutResult = {
+  checkoutUrl:
+    string;
+
+  sessionId:
     string;
 
   planId:
     TripleNPlanId;
+};
 
-  /**
-   * Optional capabilities.
-   *
-   * Development:
-   * usually omitted.
-   *
-   * Production:
-   * supplied by the real eligibility layer.
-   */
-  capabilities?:
-    PaymentProviderCapabilityInput;
+type CheckoutFunctionResponse = {
+  checkoutUrl?:
+    unknown;
+
+  sessionId?:
+    unknown;
+
+  planId?:
+    unknown;
+
+  error?:
+    unknown;
 };
 
 /* =========================================================
- * Provider resolution
+ * Constants
  * ======================================================= */
 
-export function resolveCheckoutProvider(
-  request:
-    TripleNCheckoutRequest
-): PaymentProviderResolution {
+const STRIPE_CHECKOUT_FUNCTION =
+  'create-stripe-checkout';
+
+/* =========================================================
+ * Generic helpers
+ * ======================================================= */
+
+function isPlanId(
+  value:
+    unknown
+): value is TripleNPlanId {
+  return (
+    value ===
+      'monthly' ||
+    value ===
+      'yearly'
+  );
+}
+
+function isHttpsUrl(
+  value:
+    unknown
+): value is string {
   if (
-    request.capabilities
+    typeof value !==
+      'string'
   ) {
-    return resolvePaymentProvider(
-      request.capabilities
-    );
+    return false;
   }
 
-  return resolveDevelopmentPaymentProvider();
+  try {
+    const url =
+      new URL(
+        value
+      );
+
+    return (
+      url.protocol ===
+        'https:'
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getErrorMessage(
+  errorCode:
+    unknown
+): string {
+  switch (
+    errorCode
+  ) {
+    case 'AUTHENTICATION_REQUIRED':
+      return 'Please sign in before starting checkout.';
+
+    case 'INVALID_AUTHENTICATION':
+      return 'Your login session is no longer valid. Please sign in again.';
+
+    case 'INVALID_PLAN':
+      return 'The selected subscription plan is invalid.';
+
+    case 'SUBSCRIPTION_ALREADY_ACTIVE':
+      return 'You already have an active Triple N subscription.';
+
+    case 'STRIPE_NOT_CONFIGURED':
+      return 'Payments are temporarily unavailable.';
+
+    case 'SUPABASE_NOT_CONFIGURED':
+      return 'Payments are temporarily unavailable.';
+
+    case 'CHECKOUT_URL_NOT_CREATED':
+      return 'Unable to open the secure checkout page.';
+
+    case 'STRIPE_CHECKOUT_FAILED':
+      return 'Unable to start Stripe Checkout. Please try again.';
+
+    case 'METHOD_NOT_ALLOWED':
+      return 'Invalid payment request.';
+
+    case 'INVALID_REQUEST_BODY':
+      return 'Invalid payment request.';
+
+    default:
+      return 'Unable to start checkout. Please try again.';
+  }
 }
 
 /* =========================================================
- * Development checkout
+ * Checkout result helpers
  * ======================================================= */
 
-function createDevelopmentCheckoutResult(
+function createFailedCheckoutResult(
   planId:
     TripleNPlanId,
   provider:
-    PaymentProvider
+    PaymentProvider | null,
+  errorCode:
+    string,
+  errorMessage:
+    string
 ): PaymentCheckoutResult {
   return {
     status:
-      'succeeded',
+      'failed',
 
     provider,
 
     planId,
 
+    checkoutUrl:
+      null,
+
     transactionId:
-      `development-${Date.now()}`,
+      null,
 
     subscriptionId:
-      `development-subscription-${Date.now()}`,
-
-    errorCode:
       null,
 
-    errorMessage:
-      null,
+    errorCode,
+
+    errorMessage,
   };
 }
 
 /* =========================================================
- * Real provider placeholders
+ * Authentication
+ * ======================================================= */
+
+async function requireAuthenticatedUser() {
+  const {
+    data:
+      sessionData,
+    error:
+      sessionError,
+  } =
+    await supabase
+      .auth
+      .getSession();
+
+  if (
+    sessionError
+  ) {
+    throw new Error(
+      sessionError.message
+    );
+  }
+
+  const session =
+    sessionData
+      .session;
+
+  if (
+    !session ||
+    !session.user
+  ) {
+    throw new Error(
+      'Please sign in before starting checkout.'
+    );
+  }
+
+  return {
+    user:
+      session.user,
+
+    session,
+  };
+}
+
+/* =========================================================
+ * Create Stripe Checkout Session
+ * ======================================================= */
+
+export async function createStripeCheckout(
+  planId:
+    TripleNPlanId
+): Promise<CreateCheckoutResult> {
+  if (
+    !isPlanId(
+      planId
+    )
+  ) {
+    throw new Error(
+      'Invalid subscription plan.'
+    );
+  }
+
+  const {
+    session,
+  } =
+    await requireAuthenticatedUser();
+
+  const {
+    data,
+    error,
+  } =
+    await supabase
+      .functions
+      .invoke(
+        STRIPE_CHECKOUT_FUNCTION,
+        {
+          body: {
+            planId,
+          },
+
+          headers: {
+            Authorization:
+              `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+  if (
+    error
+  ) {
+    console.error(
+      'create-stripe-checkout invocation failed:',
+      error
+    );
+
+    throw new Error(
+      error.message ||
+      'Unable to connect to the payment service.'
+    );
+  }
+
+  const response =
+    data as
+      | CheckoutFunctionResponse
+      | null;
+
+  if (
+    !response
+  ) {
+    throw new Error(
+      'The payment service returned an empty response.'
+    );
+  }
+
+  if (
+    response.error
+  ) {
+    console.error(
+      'create-stripe-checkout returned an error:',
+      response.error
+    );
+
+    throw new Error(
+      getErrorMessage(
+        response.error
+      )
+    );
+  }
+
+  if (
+    !isHttpsUrl(
+      response.checkoutUrl
+    )
+  ) {
+    console.error(
+      'Invalid Stripe Checkout URL:',
+      response.checkoutUrl
+    );
+
+    throw new Error(
+      'The payment service returned an invalid checkout URL.'
+    );
+  }
+
+  if (
+    typeof response
+      .sessionId !==
+      'string' ||
+    !response
+      .sessionId
+      .trim()
+  ) {
+    console.error(
+      'Invalid Stripe Checkout Session ID:',
+      response.sessionId
+    );
+
+    throw new Error(
+      'The payment service returned an invalid checkout session.'
+    );
+  }
+
+  if (
+    !isPlanId(
+      response.planId
+    )
+  ) {
+    console.error(
+      'Invalid checkout plan returned by server:',
+      response.planId
+    );
+
+    throw new Error(
+      'The payment service returned an invalid subscription plan.'
+    );
+  }
+
+  if (
+    response.planId !==
+      planId
+  ) {
+    console.error(
+      'Checkout plan mismatch:',
+      {
+        requestedPlan:
+          planId,
+
+        returnedPlan:
+          response.planId,
+      }
+    );
+
+    throw new Error(
+      'The payment service returned a different subscription plan.'
+    );
+  }
+
+  return {
+    checkoutUrl:
+      response.checkoutUrl,
+
+    sessionId:
+      response.sessionId,
+
+    planId:
+      response.planId,
+  };
+}
+
+/* =========================================================
+ * Provider checkout
  * ======================================================= */
 
 async function startStripeCheckout(
   input:
     StartCheckoutInput
 ): Promise<PaymentCheckoutResult> {
-  void input;
+  try {
+    const checkout =
+      await createStripeCheckout(
+        input.planId
+      );
 
-  return {
-    status:
-      'failed',
+    /*
+     * Stripe Checkout Session exists, but payment has not
+     * yet been verified.
+     *
+     * Therefore status remains pending.
+     *
+     * checkoutUrl is returned to the UI so the secure
+     * Stripe-hosted checkout can be opened.
+     *
+     * transactionId temporarily contains the Stripe
+     * Checkout Session ID.
+     *
+     * The authoritative subscription ID and active status
+     * are synchronized later by the Stripe webhook.
+     */
 
-    provider:
+    return {
+      status:
+        'pending',
+
+      provider:
+        'stripe',
+
+      planId:
+        checkout.planId,
+
+      checkoutUrl:
+        checkout.checkoutUrl,
+
+      transactionId:
+        checkout.sessionId,
+
+      subscriptionId:
+        null,
+
+      errorCode:
+        null,
+
+      errorMessage:
+        null,
+    };
+  } catch (
+    error:
+      unknown
+  ) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Unable to start Stripe Checkout.';
+
+    console.error(
+      'Stripe checkout failed:',
+      error
+    );
+
+    return createFailedCheckoutResult(
+      input.planId,
       'stripe',
-
-    planId:
-      input.planId,
-
-    transactionId:
-      null,
-
-    subscriptionId:
-      null,
-
-    errorCode:
-      'STRIPE_NOT_CONNECTED',
-
-    errorMessage:
-      'Stripe checkout is not connected yet.',
-  };
-}
-
-async function startAppleCheckout(
-  input:
-    StartCheckoutInput
-): Promise<PaymentCheckoutResult> {
-  void input;
-
-  return {
-    status:
-      'failed',
-
-    provider:
-      'apple',
-
-    planId:
-      input.planId,
-
-    transactionId:
-      null,
-
-    subscriptionId:
-      null,
-
-    errorCode:
-      'APPLE_IAP_NOT_CONNECTED',
-
-    errorMessage:
-      'Apple In-App Purchase is not connected yet.',
-  };
-}
-
-async function startGoogleCheckout(
-  input:
-    StartCheckoutInput
-): Promise<PaymentCheckoutResult> {
-  void input;
-
-  return {
-    status:
-      'failed',
-
-    provider:
-      'google',
-
-    planId:
-      input.planId,
-
-    transactionId:
-      null,
-
-    subscriptionId:
-      null,
-
-    errorCode:
-      'GOOGLE_BILLING_NOT_CONNECTED',
-
-    errorMessage:
-      'Google Play Billing is not connected yet.',
-  };
+      'STRIPE_CHECKOUT_FAILED',
+      message
+    );
+  }
 }
 
 /* =========================================================
@@ -201,181 +490,99 @@ async function startProviderCheckout(
     input.provider
   ) {
     case 'stripe':
-      return startStripeCheckout(
+      return await startStripeCheckout(
         input
       );
 
     case 'apple':
-      return startAppleCheckout(
-        input
+      return createFailedCheckoutResult(
+        input.planId,
+        'apple',
+        'APPLE_IAP_NOT_CONFIGURED',
+        'Apple In-App Purchase is not configured.'
       );
 
     case 'google':
-      return startGoogleCheckout(
-        input
+      return createFailedCheckoutResult(
+        input.planId,
+        'google',
+        'GOOGLE_BILLING_NOT_CONFIGURED',
+        'Google Play Billing is not configured.'
       );
 
     default:
-      return {
-        status:
-          'failed',
-
-        provider:
-          null,
-
-        planId:
-          input.planId,
-
-        transactionId:
-          null,
-
-        subscriptionId:
-          null,
-
-        errorCode:
-          'PAYMENT_PROVIDER_UNSUPPORTED',
-
-        errorMessage:
-          'No supported payment provider is available.',
-      };
+      return createFailedCheckoutResult(
+        input.planId,
+        null,
+        'PAYMENT_PROVIDER_UNSUPPORTED',
+        'No supported payment provider is available.'
+      );
   }
 }
 
 /* =========================================================
- * Main checkout
+ * Main checkout API
  * ======================================================= */
 
-export async function startCheckout(
-  request:
-    TripleNCheckoutRequest
-): Promise<PaymentCheckoutResult> {
-  if (
-    !request.userId
-      .trim()
-  ) {
-    return {
-      status:
-        'failed',
+export async function startCheckout({
+  userId,
+  planId,
+}: {
+  userId:
+    string;
 
-      provider:
-        null,
-
-      planId:
-        request.planId,
-
-      transactionId:
-        null,
-
-      subscriptionId:
-        null,
-
-      errorCode:
-        'AUTHENTICATED_USER_REQUIRED',
-
-      errorMessage:
-        'An authenticated user is required before checkout.',
-    };
-  }
-
-  const resolution =
-    resolveCheckoutProvider(
-      request
-    );
-
-  const provider =
-    resolution
-      .selectedProvider;
+  planId:
+    TripleNPlanId;
+}): Promise<PaymentCheckoutResult> {
+  const normalizedUserId =
+    userId.trim();
 
   if (
-    !provider
+    !normalizedUserId
   ) {
-    return {
-      status:
-        'failed',
-
-      provider:
-        null,
-
-      planId:
-        request.planId,
-
-      transactionId:
-        null,
-
-      subscriptionId:
-        null,
-
-      errorCode:
-        'NO_ELIGIBLE_PAYMENT_PROVIDER',
-
-      errorMessage:
-        'No eligible payment provider is currently available.',
-    };
-  }
-
-  /* -------------------------------------------------------
-   * Development bypass
-   * ----------------------------------------------------- */
-
-  if (
-    PAYMENT_ENVIRONMENT ===
-      'development' &&
-    !REAL_PAYMENTS_ENABLED &&
-    ALLOW_DEVELOPMENT_CONTINUE
-  ) {
-    return createDevelopmentCheckoutResult(
-      request.planId,
-      provider
+    return createFailedCheckoutResult(
+      planId,
+      null,
+      'AUTHENTICATED_USER_REQUIRED',
+      'You must be signed in before continuing.'
     );
   }
 
-  /* -------------------------------------------------------
-   * Safety check
-   * ----------------------------------------------------- */
-
   if (
-    !REAL_PAYMENTS_ENABLED
+    !isPlanId(
+      planId
+    )
   ) {
-    return {
-      status:
-        'failed',
-
-      provider,
-
-      planId:
-        request.planId,
-
-      transactionId:
-        null,
-
-      subscriptionId:
-        null,
-
-      errorCode:
-        'REAL_PAYMENTS_DISABLED',
-
-      errorMessage:
-        'Real payments are currently disabled.',
-    };
+    return createFailedCheckoutResult(
+      planId,
+      null,
+      'INVALID_PLAN',
+      'The selected subscription plan is invalid.'
+    );
   }
 
-  /* -------------------------------------------------------
-   * Real checkout
-   * ----------------------------------------------------- */
+  /*
+   * Stripe is currently Triple N's configured payment
+   * provider.
+   *
+   * The Edge Function independently authenticates the
+   * caller. userId is therefore not trusted as proof of
+   * identity or authorization.
+   */
 
-  return startProviderCheckout({
+  return await startProviderCheckout({
     userId:
-      request.userId,
+      normalizedUserId,
 
-    planId:
-      request.planId,
+    planId,
 
-    provider,
+    provider:
+      'stripe',
   });
 }
 
 /* =========================================================
- * Checkout helpers
+ * Checkout state helpers
  * ======================================================= */
 
 export function isCheckoutSuccessful(
@@ -384,7 +591,7 @@ export function isCheckoutSuccessful(
 ): boolean {
   return (
     result.status ===
-    'succeeded'
+      'succeeded'
   );
 }
 
@@ -394,7 +601,7 @@ export function isCheckoutCancelled(
 ): boolean {
   return (
     result.status ===
-    'cancelled'
+      'cancelled'
   );
 }
 
@@ -404,6 +611,24 @@ export function isCheckoutPending(
 ): boolean {
   return (
     result.status ===
-    'pending'
+      'pending'
+  );
+}
+
+/* =========================================================
+ * Convenience functions
+ * ======================================================= */
+
+export async function createMonthlyCheckout():
+  Promise<CreateCheckoutResult> {
+  return await createStripeCheckout(
+    'monthly'
+  );
+}
+
+export async function createYearlyCheckout():
+  Promise<CreateCheckoutResult> {
+  return await createStripeCheckout(
+    'yearly'
   );
 }

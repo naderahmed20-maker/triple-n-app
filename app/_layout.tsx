@@ -46,7 +46,13 @@ import {
 } from '@/lib/i18n';
 
 import {
+  getGuideCompleted,
+  subscribeToGuideCompletion,
+} from '@/lib/guideService';
+
+import {
   checkSubscriptionAccess,
+  subscribeToSubscriptionAccessChanges,
 } from '@/lib/subscriptionService';
 
 import {
@@ -101,19 +107,9 @@ type DeviceGateResult = {
  * Device compatibility constants
  * ======================================================= */
 
-/**
- * الحد الأدنى الآمن المبلغ عنه لتشغيل EdgeSAM محليًا.
- *
- * Device.totalMemory قد يعرض قيمة أقل قليلًا من الرقم
- * التجاري المكتوب على الجهاز، لذلك أجهزة فئة 4 GB
- * يمكنها المرور بصورة آمنة.
- */
 const MINIMUM_REPORTED_RAM_BYTES =
   3 * 1024 * 1024 * 1024;
 
-/**
- * القيمة المفضلة وليست شرط منع إضافيًا.
- */
 const RECOMMENDED_RAM_BYTES =
   4 * 1024 * 1024 * 1024;
 
@@ -739,6 +735,20 @@ function RootNavigationStack() {
         }}
       >
         <Stack.Screen
+          name="guide"
+          options={{
+            gestureEnabled:
+              false,
+
+            fullScreenGestureEnabled:
+              false,
+
+            animation:
+              'fade',
+          }}
+        />
+
+        <Stack.Screen
           name="login"
           options={{
             gestureEnabled:
@@ -987,6 +997,22 @@ export default function RootLayout() {
     );
 
   const [
+    guideReady,
+    setGuideReady,
+  ] =
+    useState(
+      false
+    );
+
+  const [
+    guideCompleted,
+    setGuideCompleted,
+  ] =
+    useState(
+      false
+    );
+
+  const [
     sessionReady,
     setSessionReady,
   ] =
@@ -1023,6 +1049,33 @@ export default function RootLayout() {
     );
 
   /* =======================================================
+   * Subscription access change listener
+   * ===================================================== */
+
+  useEffect(() => {
+    const unsubscribe =
+      subscribeToSubscriptionAccessChanges(
+        hasAccess => {
+          if (
+            !mountedRef.current
+          ) {
+            return;
+          }
+
+          setHasSubscriptionAccess(
+            hasAccess
+          );
+
+          setSubscriptionReady(
+            true
+          );
+        }
+      );
+
+    return unsubscribe;
+  }, []);
+
+  /* =======================================================
    * Mounted state
    * ===================================================== */
 
@@ -1033,6 +1086,91 @@ export default function RootLayout() {
     return () => {
       mountedRef.current =
         false;
+    };
+  }, []);
+
+  /* =======================================================
+   * First launch guide
+   * ===================================================== */
+
+  useEffect(() => {
+    let active =
+      true;
+
+    const unsubscribe =
+      subscribeToGuideCompletion(
+        completed => {
+          if (
+            !active ||
+            !mountedRef.current
+          ) {
+            return;
+          }
+
+          setGuideCompleted(
+            completed
+          );
+
+          setGuideReady(
+            true
+          );
+        }
+      );
+
+    async function loadGuideState():
+      Promise<void> {
+      try {
+        const completed =
+          await getGuideCompleted();
+
+        if (
+          !active ||
+          !mountedRef.current
+        ) {
+          return;
+        }
+
+        setGuideCompleted(
+          completed
+        );
+      } catch (error) {
+        console.log(
+          'GUIDE STATE LOAD ERROR:',
+          error
+        );
+
+        if (
+          active &&
+          mountedRef.current
+        ) {
+          /*
+           * لو AsyncStorage فشل،
+           * الأفضل إظهار الـGuide
+           * بدل تخطيه.
+           */
+          setGuideCompleted(
+            false
+          );
+        }
+      } finally {
+        if (
+          active &&
+          mountedRef.current
+        ) {
+          setGuideReady(
+            true
+          );
+        }
+      }
+    }
+
+    void loadGuideState();
+
+    return () => {
+      active =
+        false;
+
+      unsubscribe();
     };
   }, []);
 
@@ -1155,7 +1293,20 @@ export default function RootLayout() {
    * ===================================================== */
 
   useEffect(() => {
+    /*
+     * لا نبدأ الـAuth قبل انتهاء الـGuide.
+     *
+     * الهدف:
+     *
+     * First launch
+     *   ↓
+     * Quick Guide
+     *   ↓
+     * Login / Signup
+     */
     if (
+      !guideReady ||
+      !guideCompleted ||
       deviceGate.status !==
         'supported'
     ) {
@@ -1292,6 +1443,8 @@ export default function RootLayout() {
         .unsubscribe();
     };
   }, [
+    guideReady,
+    guideCompleted,
     deviceGate.status,
     disposeScanProcessing,
   ]);
@@ -1412,49 +1565,38 @@ export default function RootLayout() {
     deviceGate.status,
     sessionReady,
     hasSession,
-    segments,
   ]);
 
   /* =======================================================
    * Scan Item foreground processing initialization
    * ===================================================== */
 
- useEffect(() => {
-  /*
-   * ممنوع تحميل أو تهيئة نظام معالجة الصور
-   * قبل التأكد أن المستخدم لديه Subscription Access.
-   *
-   * النتيجة:
-   *
-   * Login
-   *   ↓
-   * Subscription check
-   *   ↓
-   * Payment screen إذا لم يوجد access
-   *   ↓
-   * لا EdgeSAM
-   *   ↓
-   * لا SegmentationEngine
-   *   ↓
-   * لا Scan Processing initialization
-   *
-   * وبعد الحصول على access فقط:
-   *
-   * Home
-   *   ↓
-   * Scan Processing يصبح مسموحًا بالتهيئة.
-   */
-  if (
-    deviceGate.status !==
-      'supported' ||
-    !sessionReady ||
-    !hasSession ||
-    !subscriptionReady ||
-    hasSubscriptionAccess !==
-      true
-  ) {
-    return;
-  }
+  useEffect(() => {
+    /*
+     * ممنوع تحميل أو تهيئة نظام معالجة الصور
+     * قبل التأكد أن المستخدم لديه Subscription Access.
+     *
+     * Login
+     *   ↓
+     * Subscription check
+     *   ↓
+     * Payment
+     *   ↓
+     * Subscription Access
+     *   ↓
+     * Scan Processing initialization
+     */
+    if (
+      deviceGate.status !==
+        'supported' ||
+      !sessionReady ||
+      !hasSession ||
+      !subscriptionReady ||
+      hasSubscriptionAccess !==
+        true
+    ) {
+      return;
+    }
 
     let active =
       true;
@@ -1523,12 +1665,6 @@ export default function RootLayout() {
                       );
                     }
 
-                    /*
-                     * processedImageUri هنا file:// محلي.
-                     *
-                     * نرفعه أولًا إلى Supabase Storage،
-                     * ثم نحفظ الرابط الدائم فقط في قاعدة البيانات.
-                     */
                     const uploadedProcessedImage =
                       await storageModule
                         .uploadWardrobeImage(
@@ -1555,10 +1691,6 @@ export default function RootLayout() {
                           image:
                             uploadedProcessedImage,
 
-                          /*
-                           * لا نحفظ originalImageUri لأنها file:// محلية
-                           * وقد تختفي بعد Build جديد.
-                           */
                           cleaned_image_path:
                             uploadedProcessedImage,
 
@@ -1616,15 +1748,9 @@ export default function RootLayout() {
                 processedFileNamePrefix:
                   'scan-item-queue',
 
-                /*
-                 * تشغيل Queue مسموح أثناء فتح التطبيق.
-                 */
                 autoStartQueue:
                   false,
 
-                /*
-                 * ممنوع طلب أي تنفيذ بعد إغلاق التطبيق.
-                 */
                 autoStartBackgroundProcessing:
                   false,
 
@@ -1681,45 +1807,85 @@ export default function RootLayout() {
         false;
     };
   }, [
-  deviceGate.status,
-  sessionReady,
-  hasSession,
-  subscriptionReady,
-  hasSubscriptionAccess,
-]);
-
-/* =======================================================
- * Dispose Scan Processing when subscription access is lost
- * ===================================================== */
-
-useEffect(() => {
-  if (
-    !sessionReady ||
-    !subscriptionReady
-  ) {
-    return;
-  }
-
-  if (
-    !hasSession ||
-    hasSubscriptionAccess !==
-      true
-  ) {
-    void disposeScanProcessing();
-  }
-}, [
-  sessionReady,
-  subscriptionReady,
-  hasSession,
-  hasSubscriptionAccess,
-  disposeScanProcessing,
-]);
+    deviceGate.status,
+    sessionReady,
+    hasSession,
+    subscriptionReady,
+    hasSubscriptionAccess,
+  ]);
 
   /* =======================================================
-   * Authentication + subscription navigation guard
+   * Dispose Scan Processing when subscription access is lost
    * ===================================================== */
 
   useEffect(() => {
+    if (
+      !sessionReady ||
+      !subscriptionReady
+    ) {
+      return;
+    }
+
+    if (
+      !hasSession ||
+      hasSubscriptionAccess !==
+        true
+    ) {
+      void disposeScanProcessing();
+    }
+  }, [
+    sessionReady,
+    subscriptionReady,
+    hasSession,
+    hasSubscriptionAccess,
+    disposeScanProcessing,
+  ]);
+
+  /* =======================================================
+   * Guide + Authentication + Subscription navigation guard
+   * ===================================================== */
+
+  useEffect(() => {
+    if (
+      !guideReady
+    ) {
+      return;
+    }
+
+    const firstSegment =
+  String(
+    segments[0] ??
+      ''
+  );
+
+const inGuideScreen =
+  firstSegment ===
+    'guide';
+
+    /*
+     * أول تشغيل:
+     *
+     * الـGuide له أولوية مطلقة
+     * على Login / Payment / Home.
+     */
+    if (
+      !guideCompleted
+    ) {
+      if (
+        !inGuideScreen
+      ) {
+        router.replace(
+          '/guide' as never
+        );
+      }
+
+      return;
+    }
+
+    /*
+     * بعد إنهاء الـGuide ننتظر
+     * فحص الجهاز والجلسة.
+     */
     if (
       deviceGate.status !==
         'supported' ||
@@ -1729,9 +1895,6 @@ useEffect(() => {
     ) {
       return;
     }
-
-    const firstSegment =
-      segments[0];
 
     const inAuthScreen =
       firstSegment ===
@@ -1761,7 +1924,8 @@ useEffect(() => {
     }
 
     /*
-     * يوجد مستخدم، لكن فحص الاشتراك لم ينته بعد.
+     * يوجد مستخدم لكن فحص الاشتراك
+     * لم ينته بعد.
      */
     if (
       !subscriptionReady ||
@@ -1772,15 +1936,15 @@ useEffect(() => {
     }
 
     /*
-     * المستخدم لديه اشتراك صالح،
-     * أو Development Access مؤقت.
+     * المستخدم لديه Subscription Access.
      */
     if (
       hasSubscriptionAccess
     ) {
       if (
         inAuthScreen ||
-        inPaymentScreen
+        inPaymentScreen ||
+        inGuideScreen
       ) {
         router.replace(
           '/home' as never
@@ -1791,8 +1955,8 @@ useEffect(() => {
     }
 
     /*
-     * المستخدم مسجل الدخول ولكن ليس لديه
-     * وصول صالح: صفحة الدفع إجبارية.
+     * المستخدم مسجل الدخول
+     * لكن لا يملك وصولًا صالحًا.
      */
     if (
       !inPaymentScreen
@@ -1802,6 +1966,8 @@ useEffect(() => {
       );
     }
   }, [
+    guideReady,
+    guideCompleted,
     deviceGate.status,
     sessionReady,
     hasSession,
@@ -1814,6 +1980,48 @@ useEffect(() => {
    * Rendering gates
    * ===================================================== */
 
+  /*
+   * أول حاجة نقرأ هل المستخدم
+   * شاهد الـQuick Guide من قبل.
+   */
+  if (
+    !guideReady
+  ) {
+    return (
+      <TranslationProvider>
+        <StartupLoadingScreen />
+
+        <StatusBar
+          style="light"
+        />
+      </TranslationProvider>
+    );
+  }
+
+  /*
+   * أول مرة فقط:
+   *
+   * نسمح بعرض Root Navigation
+   * حتى يفتح /guide.
+   *
+   * لا Login.
+   * لا Payment.
+   * لا Home.
+   */
+  if (
+    !guideCompleted
+  ) {
+    return (
+      <TranslationProvider>
+        <RootNavigationStack />
+      </TranslationProvider>
+    );
+  }
+
+  /*
+   * بعد إنهاء الـGuide يبدأ
+   * الـDevice Gate الطبيعي.
+   */
   if (
     deviceGate.status ===
       'checking'

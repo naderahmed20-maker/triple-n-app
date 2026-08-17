@@ -218,9 +218,6 @@ export default function PaymentScreen() {
          * We will only arrive here after the payment
          * architecture allows verified access.
          */
-        router.replace(
-          '/home' as never
-        );
 
         return;
       }
