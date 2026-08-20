@@ -6,6 +6,11 @@ import {
   createClient,
 } from "npm:@supabase/supabase-js@^2";
 
+import {
+  reportPaidStripeInvoiceToApple,
+  reportStripeRefundToApple,
+} from "../_shared/appleExternalPurchaseReporting.ts";
+
 /* =========================================================
  * Triple N - Stripe Webhook
  *
@@ -16,6 +21,7 @@ import {
  * - Resolve the Triple N user from Stripe.
  * - Synchronize Stripe subscription state to Supabase.
  * - Handle renewals, cancellations and payment failures.
+ * - Report eligible EU iOS external purchases to Apple.
  *
  * IMPORTANT:
  *
@@ -1029,12 +1035,39 @@ async function handleSubscriptionEvent(
 
 /* =========================================================
  * Invoice paid
+ *
+ * Stripe remains the authoritative subscription source.
+ *
+ * Apple reporting is attempted only after:
+ *
+ * 1. Retrieving the authoritative finalized Stripe invoice.
+ * 2. Resolving the Stripe subscription.
+ * 3. Resolving the authenticated Triple N user mapping.
+ * 4. Synchronizing subscription access.
+ *
+ * Non-iOS / non-EU Stripe payments have no Apple external
+ * purchase token and are skipped by the reporting service.
  * ======================================================= */
 
 async function handleInvoicePaid(
-  invoice:
+  webhookInvoice:
     Stripe.Invoice
 ): Promise<void> {
+  /* -------------------------------------------------------
+   * Retrieve authoritative finalized invoice
+   * ----------------------------------------------------- */
+
+  const invoice =
+    await stripe
+      .invoices
+      .retrieve(
+        webhookInvoice.id
+      );
+
+  /* -------------------------------------------------------
+   * Resolve subscription
+   * ----------------------------------------------------- */
+
   const subscriptionId =
     getInvoiceSubscriptionId(
       invoice
@@ -1051,11 +1084,123 @@ async function handleInvoicePaid(
     return;
   }
 
-  await syncSubscriptionById(
-    subscriptionId,
+  /* -------------------------------------------------------
+   * Retrieve authoritative subscription
+   * ----------------------------------------------------- */
+
+  const subscription =
+    await stripe
+      .subscriptions
+      .retrieve(
+        subscriptionId
+      );
+
+  /* -------------------------------------------------------
+   * Resolve Triple N user
+   * ----------------------------------------------------- */
+
+  const userId =
+    await findUserIdForSubscription(
+      subscription
+    );
+
+  /* -------------------------------------------------------
+   * Synchronize subscription state first
+   *
+   * Access synchronization must not depend on whether this
+   * was an Apple EU external purchase.
+   * ----------------------------------------------------- */
+
+  await syncSubscription(
+    subscription,
     {
+      preferredUserId:
+        userId,
+
       providerTransactionId:
         invoice.id,
+    }
+  );
+
+  /* -------------------------------------------------------
+   * Apple reporting requires a known Triple N user
+   * ----------------------------------------------------- */
+
+  if (
+    !userId
+  ) {
+    console.warn(
+      "Apple reporting skipped because Stripe subscription could not be mapped to a Triple N user:",
+      subscriptionId
+    );
+
+    return;
+  }
+
+  /* -------------------------------------------------------
+   * Resolve Triple N plan
+   * ----------------------------------------------------- */
+
+  const planId =
+    getPlanId(
+      subscription
+    );
+
+  if (
+    !planId
+  ) {
+    throw new Error(
+      `Unable to determine Triple N plan for Apple reporting: ${subscriptionId}`
+    );
+  }
+
+  /* -------------------------------------------------------
+   * Apple External Purchase reporting
+   *
+   * reportPaidStripeInvoiceToApple() is responsible for:
+   *
+   * - detecting whether Apple external-purchase tokens exist;
+   * - ensuring a token was active at transaction time;
+   * - preventing duplicate invoice reporting;
+   * - deciding SUBSCRIPTION_START vs RENEWAL;
+   * - using the original lineItemId for renewals;
+   * - reading Stripe tax and currency information;
+   * - sending the report to Apple's server API;
+   * - storing request/response status in Supabase.
+   * ----------------------------------------------------- */
+
+  const appleResult =
+    await reportPaidStripeInvoiceToApple({
+      supabaseAdmin,
+
+      invoice,
+
+      userId,
+
+      subscriptionId,
+
+      planId,
+    });
+
+  console.log(
+    "Apple external purchase reporting result:",
+    {
+      invoiceId:
+        invoice.id,
+
+      subscriptionId,
+
+      submitted:
+        appleResult
+          .submitted,
+
+      skipped:
+        appleResult
+          .skipped,
+
+      reason:
+        appleResult
+          .reason,
     }
   );
 }
@@ -1092,6 +1237,275 @@ async function handleInvoicePaymentFailed(
 
       statusOverride:
         "past_due",
+    }
+  );
+}
+
+
+/* =========================================================
+ * Stripe refund -> Apple
+ * ======================================================= */
+
+async function handleStripeRefundForApple(
+  webhookRefund:
+    Stripe.Refund
+): Promise<void> {
+  /*
+   * refund.created can represent a pending refund for some
+   * payment methods. Only report completed refunds to Apple.
+   */
+
+  const refund =
+    await stripe
+      .refunds
+      .retrieve(
+        webhookRefund.id
+      );
+
+  if (
+    refund.status !==
+      "succeeded"
+  ) {
+    console.log(
+      "Ignoring non-succeeded refund:",
+      refund.id,
+      refund.status
+    );
+
+    return;
+  }
+
+  const paymentIntentId =
+    getStripeId(
+      refund
+        .payment_intent
+    );
+
+  if (
+    !paymentIntentId
+  ) {
+    console.warn(
+      "Refund has no PaymentIntent:",
+      refund.id
+    );
+
+    return;
+  }
+
+  /*
+   * Modern Stripe invoices expose their PaymentIntent through
+   * Invoice Payments. Use the authoritative relation instead
+   * of guessing from customer/subscription state.
+   */
+
+  const invoicePayments =
+    await (
+      stripe as unknown as {
+        invoicePayments: {
+          list(
+            params:
+              Record<
+                string,
+                unknown
+              >
+          ): Promise<{
+            data:
+              Array<{
+                invoice?:
+                  string |
+                  {
+                    id:
+                      string;
+                  } |
+                  null;
+              }>;
+          }>;
+        };
+      }
+    )
+      .invoicePayments
+      .list({
+        payment: {
+          type:
+            "payment_intent",
+
+          payment_intent:
+            paymentIntentId,
+        },
+
+        limit:
+          10,
+      });
+
+  let invoiceId:
+    string | null =
+      null;
+
+  for (
+    const invoicePayment
+    of invoicePayments.data
+  ) {
+    invoiceId =
+      getStripeId(
+        invoicePayment
+          .invoice
+      );
+
+    if (
+      invoiceId
+    ) {
+      break;
+    }
+  }
+
+  if (
+    !invoiceId
+  ) {
+    console.log(
+      "Refund is not attached to a Stripe invoice:",
+      refund.id
+    );
+
+    return;
+  }
+
+  const invoice =
+    await stripe
+      .invoices
+      .retrieve(
+        invoiceId
+      );
+
+  const typedInvoice =
+    invoice as
+      Stripe.Invoice & {
+        total_taxes?:
+          Array<{
+            amount?:
+              number;
+          }> | null;
+
+        tax?:
+          number | null;
+      };
+
+  let invoiceTaxMinor =
+    0;
+
+  if (
+    Array.isArray(
+      typedInvoice
+        .total_taxes
+    )
+  ) {
+    invoiceTaxMinor =
+      typedInvoice
+        .total_taxes
+        .reduce(
+          (
+            sum,
+            tax
+          ) =>
+            sum +
+            (
+              typeof tax.amount ===
+                "number"
+                ? tax.amount
+                : 0
+            ),
+          0
+        );
+  } else if (
+    typeof typedInvoice
+      .tax ===
+      "number"
+  ) {
+    invoiceTaxMinor =
+      typedInvoice.tax;
+  }
+
+  if (
+    invoice.amount_paid <=
+      0
+  ) {
+    throw new Error(
+      `INVALID_REFUND_INVOICE_AMOUNT:${invoice.id}`
+    );
+  }
+
+  /*
+   * Stripe Tax distributes an invoice-payment refund between
+   * tax and pre-tax amount. Triple N has a single subscription
+   * line, so the proportional split matches that distribution.
+   */
+
+  let refundTaxMinor =
+    Math.round(
+      refund.amount *
+      invoiceTaxMinor /
+      invoice.amount_paid
+    );
+
+  /*
+   * Full refund must consume the exact original tax amount,
+   * avoiding any integer rounding difference.
+   */
+
+  if (
+    refund.amount ===
+      invoice.amount_paid
+  ) {
+    refundTaxMinor =
+      invoiceTaxMinor;
+  }
+
+  refundTaxMinor =
+    Math.max(
+      0,
+      Math.min(
+        refund.amount,
+        refundTaxMinor
+      )
+    );
+
+  const result =
+    await reportStripeRefundToApple({
+      supabaseAdmin,
+
+      stripeRefundId:
+        refund.id,
+
+      stripeInvoiceId:
+        invoice.id,
+
+      creationDateMs:
+        refund.created *
+        1000,
+
+      amountTaxInclusiveMinor:
+        refund.amount,
+
+      taxAmountMinor:
+        refundTaxMinor,
+    });
+
+  console.log(
+    "Apple refund reporting result:",
+    {
+      refundId:
+        refund.id,
+
+      invoiceId:
+        invoice.id,
+
+      submitted:
+        result.submitted,
+
+      skipped:
+        result.skipped,
+
+      reason:
+        result.reason,
     }
   );
 }
@@ -1204,7 +1618,8 @@ Deno.serve(
      */
 
     const body =
-      await req.text();
+      await req
+        .text();
 
     let event:
       Stripe.Event;
@@ -1356,6 +1771,38 @@ Deno.serve(
         }
 
         /* -----------------------------------------------
+         * Refunds
+         * --------------------------------------------- */
+
+        case "refund.created": {
+          const refund =
+            event
+              .data
+              .object as
+              Stripe.Refund;
+
+          await handleStripeRefundForApple(
+            refund
+          );
+
+          break;
+        }
+
+        case "refund.updated": {
+          const refund =
+            event
+              .data
+              .object as
+              Stripe.Refund;
+
+          await handleStripeRefundForApple(
+            refund
+          );
+
+          break;
+        }
+
+        /* -----------------------------------------------
          * Everything else
          * --------------------------------------------- */
 
@@ -1369,13 +1816,14 @@ Deno.serve(
       error
     ) {
       /*
-       * IMPORTANT:
+       * Return 500 for a real database/payment/reporting
+       * processing failure.
        *
-       * Return 500 for a real database/payment processing
-       * failure.
+       * Stripe can retry webhook delivery instead of
+       * Triple N silently losing an authoritative update.
        *
-       * Stripe can then retry webhook delivery instead of
-       * Triple N silently losing the subscription update.
+       * Apple report writes are idempotent by Stripe invoice
+       * and preserve their requestIdentifier/lineItemId.
        */
 
       console.error(

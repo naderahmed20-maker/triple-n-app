@@ -63,6 +63,28 @@ type CheckoutFunctionResponse = {
     unknown;
 };
 
+type SupabaseFunctionErrorBody = {
+  error?:
+    unknown;
+
+  message?:
+    unknown;
+
+  details?:
+    unknown;
+};
+
+type FunctionInvocationErrorLike = {
+  message?:
+    unknown;
+
+  context?:
+    unknown;
+
+  name?:
+    unknown;
+};
+
 /* =========================================================
  * Constants
  * ======================================================= */
@@ -132,26 +154,315 @@ function getErrorMessage(
       return 'You already have an active Triple N subscription.';
 
     case 'STRIPE_NOT_CONFIGURED':
-      return 'Payments are temporarily unavailable.';
+      return 'Stripe is not configured on the payment server.';
 
     case 'SUPABASE_NOT_CONFIGURED':
-      return 'Payments are temporarily unavailable.';
+      return 'Supabase is not configured on the payment server.';
 
     case 'CHECKOUT_URL_NOT_CREATED':
-      return 'Unable to open the secure checkout page.';
+      return 'Stripe did not return a secure checkout URL.';
 
     case 'STRIPE_CHECKOUT_FAILED':
-      return 'Unable to start Stripe Checkout. Please try again.';
+      return 'Stripe could not create the Checkout Session.';
 
     case 'METHOD_NOT_ALLOWED':
-      return 'Invalid payment request.';
+      return 'Invalid payment request method.';
 
     case 'INVALID_REQUEST_BODY':
-      return 'Invalid payment request.';
+      return 'Invalid payment request body.';
 
     default:
       return 'Unable to start checkout. Please try again.';
   }
+}
+
+function getUnknownErrorMessage(
+  error:
+    unknown
+): string {
+  if (
+    error instanceof Error
+  ) {
+    return error.message;
+  }
+
+  if (
+    typeof error ===
+      'string'
+  ) {
+    return error;
+  }
+
+  if (
+    error &&
+    typeof error ===
+      'object' &&
+    'message' in error
+  ) {
+    const message =
+      (
+        error as {
+          message?:
+            unknown;
+        }
+      ).message;
+
+    if (
+      typeof message ===
+        'string' &&
+      message.trim()
+    ) {
+      return message;
+    }
+  }
+
+  return 'Unknown payment error.';
+}
+
+/* =========================================================
+ * Edge Function error diagnostics
+ * ======================================================= */
+
+function isResponse(
+  value:
+    unknown
+): value is Response {
+  return (
+    typeof Response !==
+      'undefined' &&
+    value instanceof
+      Response
+  );
+}
+
+async function readFunctionErrorBody(
+  error:
+    unknown
+): Promise<{
+  status:
+    number | null;
+
+  errorCode:
+    string | null;
+
+  serverMessage:
+    string | null;
+
+  rawBody:
+    unknown;
+}> {
+  if (
+    !error ||
+    typeof error !==
+      'object'
+  ) {
+    return {
+      status:
+        null,
+
+      errorCode:
+        null,
+
+      serverMessage:
+        null,
+
+      rawBody:
+        null,
+    };
+  }
+
+  const invocationError =
+    error as
+      FunctionInvocationErrorLike;
+
+  const context =
+    invocationError
+      .context;
+
+  if (
+    !isResponse(
+      context
+    )
+  ) {
+    return {
+      status:
+        null,
+
+      errorCode:
+        null,
+
+      serverMessage:
+        null,
+
+      rawBody:
+        null,
+    };
+  }
+
+  const status =
+    context.status;
+
+  let rawBody:
+    unknown =
+      null;
+
+  /*
+   * Response bodies can only be consumed once.
+   * clone() prevents the diagnostic read from mutating
+   * the original Response stored on the Supabase error.
+   */
+  try {
+    const cloned =
+      context.clone();
+
+    const contentType =
+      cloned.headers
+        .get(
+          'content-type'
+        ) ??
+      '';
+
+    if (
+      contentType.includes(
+        'application/json'
+      )
+    ) {
+      rawBody =
+        await cloned
+          .json();
+    } else {
+      const text =
+        await cloned
+          .text();
+
+      rawBody =
+        text ||
+        null;
+    }
+  } catch (
+    bodyReadError
+  ) {
+    console.error(
+      'Unable to read Edge Function error body:',
+      bodyReadError
+    );
+  }
+
+  let errorCode:
+    string | null =
+      null;
+
+  let serverMessage:
+    string | null =
+      null;
+
+  if (
+    rawBody &&
+    typeof rawBody ===
+      'object'
+  ) {
+    const body =
+      rawBody as
+        SupabaseFunctionErrorBody;
+
+    if (
+      typeof body.error ===
+        'string' &&
+      body.error.trim()
+    ) {
+      errorCode =
+        body.error.trim();
+    }
+
+    if (
+      typeof body.message ===
+        'string' &&
+      body.message.trim()
+    ) {
+      serverMessage =
+        body.message.trim();
+    }
+  }
+
+  return {
+    status,
+
+    errorCode,
+
+    serverMessage,
+
+    rawBody,
+  };
+}
+
+async function throwDetailedFunctionError(
+  error:
+    unknown
+): Promise<never> {
+  const diagnostic =
+    await readFunctionErrorBody(
+      error
+    );
+
+  console.error(
+    'create-stripe-checkout diagnostic:',
+    {
+      status:
+        diagnostic.status,
+
+      errorCode:
+        diagnostic.errorCode,
+
+      serverMessage:
+        diagnostic.serverMessage,
+
+      rawBody:
+        diagnostic.rawBody,
+
+      originalMessage:
+        getUnknownErrorMessage(
+          error
+        ),
+    }
+  );
+
+  if (
+    diagnostic.errorCode
+  ) {
+    const friendlyMessage =
+      getErrorMessage(
+        diagnostic.errorCode
+      );
+
+    throw new Error(
+      `${diagnostic.errorCode}: ${friendlyMessage}`
+    );
+  }
+
+  if (
+    diagnostic.serverMessage
+  ) {
+    throw new Error(
+      diagnostic.status
+        ? `HTTP ${diagnostic.status}: ${diagnostic.serverMessage}`
+        : diagnostic.serverMessage
+    );
+  }
+
+  if (
+    diagnostic.status
+  ) {
+    throw new Error(
+      `Stripe checkout Edge Function failed with HTTP ${diagnostic.status}.`
+    );
+  }
+
+  throw new Error(
+    getUnknownErrorMessage(
+      error
+    ) ||
+    'Unable to connect to the payment service.'
+  );
 }
 
 /* =========================================================
@@ -227,6 +538,16 @@ async function requireAuthenticatedUser() {
     );
   }
 
+  if (
+    !session
+      .access_token
+      .trim()
+  ) {
+    throw new Error(
+      'Your login session does not contain a valid access token. Please sign in again.'
+    );
+  }
+
   return {
     user:
       session.user,
@@ -278,6 +599,10 @@ export async function createStripeCheckout(
         }
       );
 
+  /* =======================================================
+   * Supabase invocation failure
+   * ===================================================== */
+
   if (
     error
   ) {
@@ -286,11 +611,14 @@ export async function createStripeCheckout(
       error
     );
 
-    throw new Error(
-      error.message ||
-      'Unable to connect to the payment service.'
+    await throwDetailedFunctionError(
+      error
     );
   }
+
+  /* =======================================================
+   * Parse successful HTTP response
+   * ===================================================== */
 
   const response =
     data as
@@ -305,20 +633,39 @@ export async function createStripeCheckout(
     );
   }
 
+  /*
+   * Normally a non-2xx response is surfaced by Supabase as
+   * an invocation error.
+   *
+   * This secondary check protects us if the server returns
+   * HTTP 2xx with an application-level error object.
+   */
   if (
     response.error
   ) {
     console.error(
-      'create-stripe-checkout returned an error:',
+      'create-stripe-checkout returned an application error:',
       response.error
     );
 
+    const errorCode =
+      typeof response.error ===
+        'string'
+        ? response.error
+        : String(
+            response.error
+          );
+
     throw new Error(
-      getErrorMessage(
-        response.error
-      )
+      `${errorCode}: ${getErrorMessage(
+        errorCode
+      )}`
     );
   }
+
+  /* =======================================================
+   * Validate Checkout URL
+   * ===================================================== */
 
   if (
     !isHttpsUrl(
@@ -334,6 +681,10 @@ export async function createStripeCheckout(
       'The payment service returned an invalid checkout URL.'
     );
   }
+
+  /* =======================================================
+   * Validate Checkout Session
+   * ===================================================== */
 
   if (
     typeof response
@@ -352,6 +703,10 @@ export async function createStripeCheckout(
       'The payment service returned an invalid checkout session.'
     );
   }
+
+  /* =======================================================
+   * Validate returned plan
+   * ===================================================== */
 
   if (
     !isPlanId(
@@ -401,7 +756,7 @@ export async function createStripeCheckout(
 }
 
 /* =========================================================
- * Provider checkout
+ * Stripe checkout
  * ======================================================= */
 
 async function startStripeCheckout(
@@ -415,19 +770,14 @@ async function startStripeCheckout(
       );
 
     /*
-     * Stripe Checkout Session exists, but payment has not
-     * yet been verified.
+     * A Stripe Checkout Session now exists.
      *
-     * Therefore status remains pending.
+     * This is NOT proof that payment succeeded.
      *
-     * checkoutUrl is returned to the UI so the secure
-     * Stripe-hosted checkout can be opened.
-     *
-     * transactionId temporarily contains the Stripe
-     * Checkout Session ID.
-     *
-     * The authoritative subscription ID and active status
-     * are synchronized later by the Stripe webhook.
+     * The app receives the hosted Stripe URL and opens it.
+     * Subscription access is only granted after the Stripe
+     * webhook updates the authoritative subscription state
+     * in Supabase.
      */
 
     return {
@@ -443,6 +793,11 @@ async function startStripeCheckout(
       checkoutUrl:
         checkout.checkoutUrl,
 
+      /*
+       * The Stripe Checkout Session ID is temporarily stored
+       * as transactionId until webhook processing supplies
+       * authoritative subscription/payment identifiers.
+       */
       transactionId:
         checkout.sessionId,
 
@@ -460,9 +815,9 @@ async function startStripeCheckout(
       unknown
   ) {
     const message =
-      error instanceof Error
-        ? error.message
-        : 'Unable to start Stripe Checkout.';
+      getUnknownErrorMessage(
+        error
+      );
 
     console.error(
       'Stripe checkout failed:',
@@ -473,51 +828,23 @@ async function startStripeCheckout(
       input.planId,
       'stripe',
       'STRIPE_CHECKOUT_FAILED',
-      message
+      message ||
+      'Unable to start Stripe Checkout.'
     );
   }
 }
 
 /* =========================================================
- * Provider dispatcher
+ * Stripe-only dispatcher
  * ======================================================= */
 
 async function startProviderCheckout(
   input:
     StartCheckoutInput
 ): Promise<PaymentCheckoutResult> {
-  switch (
-    input.provider
-  ) {
-    case 'stripe':
-      return await startStripeCheckout(
-        input
-      );
-
-    case 'apple':
-      return createFailedCheckoutResult(
-        input.planId,
-        'apple',
-        'APPLE_IAP_NOT_CONFIGURED',
-        'Apple In-App Purchase is not configured.'
-      );
-
-    case 'google':
-      return createFailedCheckoutResult(
-        input.planId,
-        'google',
-        'GOOGLE_BILLING_NOT_CONFIGURED',
-        'Google Play Billing is not configured.'
-      );
-
-    default:
-      return createFailedCheckoutResult(
-        input.planId,
-        null,
-        'PAYMENT_PROVIDER_UNSUPPORTED',
-        'No supported payment provider is available.'
-      );
-  }
+  return await startStripeCheckout(
+    input
+  );
 }
 
 /* =========================================================
@@ -562,12 +889,14 @@ export async function startCheckout({
   }
 
   /*
-   * Stripe is currently Triple N's configured payment
-   * provider.
+   * Stripe is Triple N's only configured payment provider.
    *
-   * The Edge Function independently authenticates the
-   * caller. userId is therefore not trusted as proof of
-   * identity or authorization.
+   * userId is used by the client flow but is NOT trusted as
+   * authentication by the payment backend.
+   *
+   * The create-stripe-checkout Edge Function independently
+   * validates the Supabase JWT and obtains the user ID from
+   * the authenticated Supabase user.
    */
 
   return await startProviderCheckout({

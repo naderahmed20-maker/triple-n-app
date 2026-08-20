@@ -177,20 +177,12 @@ const it: Record<
   'addItem.photoInstructions':
     'Posiziona un solo capo su uno sfondo semplice e mantienilo interamente dentro l’inquadratura.',
   'addItem.scanItem': 'Scansiona articolo',
-  'addItem.gallery':
-    'Galleria',
-  'addItem.chooseGallery':
-    'Scegli dalla galleria',
   'addItem.photoHint':
     'Un solo capo • sfondo semplice • capo interamente visibile',
   'addItem.cameraPermission':
     'Autorizzazione fotocamera',
   'addItem.cameraPermissionMessage':
     'Consenti l’accesso alla fotocamera per fotografare il tuo capo.',
-  'addItem.photosPermission':
-    'Autorizzazione foto',
-  'addItem.photosPermissionMessage':
-    'Consenti l’accesso alle foto per scegliere l’immagine di un capo.',
   'addItem.preparingPhoto':
     'Preparazione foto...',
   'addItem.photoError':
@@ -247,8 +239,6 @@ const it: Record<
     'Capo non trovato',
   'editItem.loadFailed':
     'Impossibile caricare il capo.',
-  'editItem.changePhoto':
-    'Cambia foto',
   'editItem.itemNamePlaceholder':
     'Esempio: maglietta nera',
   'editItem.chooseCategory':
@@ -813,7 +803,7 @@ const it: Record<
 
   'helpCenter.addClothesTitle': 'Add Clothes',
   'helpCenter.addClothesSubtitle': 'Build your digital wardrobe',
-  'helpCenter.addClothesMessage': 'Go to Wardrobe → Add Item → Choose Photo → Select Category → Save.',
+  'helpCenter.addClothesMessage': 'Vai su Guardaroba -> Scansiona articolo -> scatta la foto -> aggiungi il capo al guardaroba.',
 
   'helpCenter.aiTitle': 'AI Outfit Suggestions',
   'helpCenter.aiSubtitle': 'How Triple N builds outfits',
@@ -883,8 +873,7 @@ const it: Record<
 'about.shareApp':
   'Condividi Triple N',
 
-'about.shareMessage':
-  'Scopri Triple N — Assistente di Moda AI.\nDownload in arrivo.',
+'about.shareMessage': 'Scopri Triple N - Assistente di Moda AI.',
 
 'about.shareError':
   'Impossibile condividere l\'app in questo momento.',
@@ -1004,7 +993,7 @@ const it: Record<
   'Questo caricamento è stato annullato.',
 
 'processingImage.removingBackground':
-  'Triple N AI sta rimuovendo lo sfondo. Puoi uscire: il lavoro continuerà.',
+  'Triple N AI sta rimuovendo lo sfondo. Mantieni Triple N aperto fino al termine dell\'elaborazione.',
 
 'processingImage.readStatusError':
   'Impossibile leggere lo stato del caricamento.',
@@ -1055,13 +1044,13 @@ const it: Record<
   'Aggiornamento...',
 
 'processingImage.canLeaveScreen':
-  'Puoi uscire da questa schermata',
+  'Mantieni Triple N aperto',
 
 'processingImage.workerContinues':
-  'Il worker continuerà a elaborare le immagini in background.',
+  'Puoi tornare al guardaroba, ma mantieni Triple N in primo piano fino al termine dell\'elaborazione.',
 
 'processingImage.continueInBackground':
-  'Continua in background',
+  'Torna al guardaroba',
 
   // Outfit Canvas
 'outfitCanvas.generateOutfit':

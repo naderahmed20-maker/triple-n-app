@@ -285,13 +285,9 @@ function normalizeProvider(
 ): PaymentProvider | null {
   if (
     value ===
-      'stripe' ||
-    value ===
-      'apple' ||
-    value ===
-      'google'
+      'stripe'
   ) {
-    return value;
+    return 'stripe';
   }
 
   return null;

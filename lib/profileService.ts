@@ -1,5 +1,5 @@
 import {
-    supabase,
+  supabase,
 } from './supabase';
 
 export type UserProfile = {

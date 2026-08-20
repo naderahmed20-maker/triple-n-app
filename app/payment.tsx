@@ -1,47 +1,59 @@
 // app/payment.tsx
 
 import {
-    Feather,
+  Feather,
 } from '@expo/vector-icons';
 
 import * as Haptics from 'expo-haptics';
 
 import {
-    router,
+  router,
 } from 'expo-router';
 
 import {
-    useMemo,
-    useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from 'react';
 
 import {
-    ActivityIndicator,
-    Alert,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  AppState,
+  Linking,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import {
-    PAYMENT_ENVIRONMENT,
-    REAL_PAYMENTS_ENABLED,
-    TRIPLE_N_PLANS,
-    canContinueFromPaywall,
-    type TripleNPlanId,
+  PAYMENT_ENVIRONMENT,
+  REAL_PAYMENTS_ENABLED,
+  TRIPLE_N_PLANS,
+  canContinueFromPaywall,
+  type TripleNPlanId,
 } from '@/lib/paymentConfig';
 
 import {
-    canEnterAppAfterPaymentFlow,
-    startPaymentFlow,
+  canEnterAppAfterPaymentFlow,
+  startPaymentFlow,
 } from '@/lib/paymentFlowService';
 
 import {
-    supabase,
+  supabase,
 } from '@/lib/supabase';
+
+import {
+  checkSubscriptionAccess,
+} from '@/lib/subscriptionService';
+
+import {
+  syncAppleExternalPurchaseTokensSilently,
+} from '@/lib/appleExternalPurchaseService';
 
 /* =========================================================
  * Payment screen
@@ -71,6 +83,269 @@ export default function PaymentScreen() {
     useState(
       false
     );
+
+  const waitingForExternalCheckoutRef =
+    useRef(
+      false
+    );
+
+  const refreshInProgressRef =
+    useRef(
+      false
+    );
+
+  /* =======================================================
+   * Refresh Apple external-purchase tokens silently
+   * ===================================================== */
+
+  async function refreshAppleTokensSilently():
+    Promise<void> {
+    try {
+      const appleResult =
+        await syncAppleExternalPurchaseTokensSilently();
+
+      if (
+        !appleResult.allowed
+      ) {
+        return;
+      }
+
+      const acquisitionToken =
+        appleResult
+          .acquisitionToken
+          ?.trim() ??
+        '';
+
+      const servicesToken =
+        appleResult
+          .servicesToken
+          ?.trim() ??
+        '';
+
+      if (
+        !acquisitionToken &&
+        !servicesToken
+      ) {
+        return;
+      }
+
+      const {
+        data:
+          sessionData,
+        error:
+          sessionError,
+      } =
+        await supabase.auth
+          .getSession();
+
+      if (
+        sessionError
+      ) {
+        throw sessionError;
+      }
+
+      const accessToken =
+        sessionData
+          .session
+          ?.access_token
+          ?.trim();
+
+      if (
+        !accessToken
+      ) {
+        return;
+      }
+
+      const {
+        data:
+          saveData,
+        error:
+          saveError,
+      } =
+        await supabase.functions
+          .invoke(
+            'save-apple-external-purchase-tokens',
+            {
+              body: {
+                acquisitionToken:
+                  acquisitionToken ||
+                  undefined,
+
+                servicesToken:
+                  servicesToken ||
+                  undefined,
+              },
+
+              headers: {
+                Authorization:
+                  `Bearer ${accessToken}`,
+              },
+            }
+          );
+
+      if (
+        saveError
+      ) {
+        throw saveError;
+      }
+
+      if (
+        !saveData ||
+        saveData.success !==
+          true
+      ) {
+        throw new Error(
+          'APPLE_EXTERNAL_PURCHASE_TOKEN_REFRESH_FAILED'
+        );
+      }
+    } catch (
+      error
+    ) {
+      console.log(
+        'APPLE SILENT TOKEN REFRESH ERROR:',
+        error
+      );
+    }
+  }
+
+  /* =======================================================
+   * Verify Stripe result after returning to Triple N
+   * ===================================================== */
+
+  async function refreshSubscriptionAfterCheckout():
+    Promise<void> {
+    if (
+      refreshInProgressRef.current
+    ) {
+      return;
+    }
+
+    refreshInProgressRef.current =
+      true;
+
+    try {
+      const {
+        data,
+        error,
+      } =
+        await supabase.auth
+          .getUser();
+
+      if (
+        error
+      ) {
+        throw error;
+      }
+
+      const user =
+        data.user;
+
+      if (
+        !user
+      ) {
+        return;
+      }
+
+      for (
+        let attempt =
+          0;
+        attempt <
+          6;
+        attempt +=
+          1
+      ) {
+        const result =
+          await checkSubscriptionAccess(
+            user.id
+          );
+
+        if (
+          result.hasAccess
+        ) {
+          waitingForExternalCheckoutRef.current =
+            false;
+
+          try {
+            await Haptics
+              .notificationAsync(
+                Haptics
+                  .NotificationFeedbackType
+                  .Success
+              );
+          } catch {
+            // Haptics are optional.
+          }
+
+          router.replace(
+            '/home' as never
+          );
+
+          return;
+        }
+
+        if (
+          attempt <
+          5
+        ) {
+          await new Promise<void>(
+            resolve =>
+              setTimeout(
+                resolve,
+                1500
+              )
+          );
+        }
+      }
+
+      Alert.alert(
+        'Payment verification',
+        'Your payment is still being verified. If the charge completed successfully, access will unlock automatically.'
+      );
+    } catch (
+      error
+    ) {
+      console.log(
+        'PAYMENT RETURN VERIFICATION ERROR:',
+        error
+      );
+    } finally {
+      refreshInProgressRef.current =
+        false;
+    }
+  }
+
+  /* =======================================================
+   * Foreground synchronization
+   * ===================================================== */
+
+  useEffect(() => {
+    void refreshAppleTokensSilently();
+
+    const appStateSubscription =
+      AppState.addEventListener(
+        'change',
+        nextState => {
+          if (
+            nextState !==
+              'active'
+          ) {
+            return;
+          }
+
+          void refreshAppleTokensSilently();
+
+          if (
+            waitingForExternalCheckoutRef.current
+          ) {
+            void refreshSubscriptionAfterCheckout();
+          }
+        }
+      );
+
+    return () => {
+      appStateSubscription.remove();
+    };
+  }, []);
 
   /* =======================================================
    * Selected plan
@@ -241,6 +516,38 @@ export default function PaymentScreen() {
         result.status ===
           'pending'
       ) {
+        const checkoutUrl =
+          result.checkout
+            .checkoutUrl;
+
+        if (
+          checkoutUrl
+        ) {
+          const supported =
+            await Linking
+              .canOpenURL(
+                checkoutUrl
+              );
+
+          if (
+            !supported
+          ) {
+            throw new Error(
+              'Unable to open the secure Stripe checkout page.'
+            );
+          }
+
+          waitingForExternalCheckoutRef.current =
+            true;
+
+          await Linking
+            .openURL(
+              checkoutUrl
+            );
+
+          return;
+        }
+
         Alert.alert(
           'Payment pending',
           'Your subscription is being verified. Triple N will unlock automatically once the payment is confirmed.'
@@ -697,28 +1004,6 @@ export default function PaymentScreen() {
                     </Text>
                   </View>
 
-                  {item.id ===
-                    'yearly' ? (
-                    <View
-                      style={
-                        styles.yearlySavingRow
-                      }
-                    >
-                      <Feather
-                        name="check-circle"
-                        size={15}
-                        color="#f1d8c2"
-                      />
-
-                      <Text
-                        style={
-                          styles.yearlySavingText
-                        }
-                      >
-                        Better value for long-term access
-                      </Text>
-                    </View>
-                  ) : null}
                 </TouchableOpacity>
               );
             }
@@ -789,7 +1074,7 @@ export default function PaymentScreen() {
                   styles.summaryLabel
                 }
               >
-                Total
+                Price before tax
               </Text>
 
               <Text
@@ -939,8 +1224,7 @@ export default function PaymentScreen() {
               styles.securityText
             }
           >
-            Secure subscription access · Cancel according to your selected billing provider
-          </Text>
+            Secure subscription access · Cancel according to your selected billing provider          </Text>
         </View>
 
         <Text
@@ -948,7 +1232,7 @@ export default function PaymentScreen() {
             styles.legalPreview
           }
         >
-          Final prices, billing terms and payment methods will be shown before any real charge is made.
+          Applicable VAT or tax is added at checkout. Final billing terms and payment methods are shown before any real charge is made.
         </Text>
 
         <Text
@@ -956,8 +1240,8 @@ export default function PaymentScreen() {
             styles.footer
           }
         >
-          TRIPLE N · PREMIUM EXPERIENCE
-        </Text>
+            TRIPLE N · PREMIUM EXPERIENCE
+ </Text>
       </ScrollView>
     </SafeAreaView>
   );

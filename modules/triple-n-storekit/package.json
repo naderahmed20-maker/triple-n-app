@@ -1,0 +1,13 @@
+﻿{
+  "name": "triple-n-storekit",
+  "version": "1.0.0",
+  "description": "Triple N StoreKit External Purchase bridge",
+  "main": "src/index.ts",
+  "private": true,
+  "license": "MIT",
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  }
+}

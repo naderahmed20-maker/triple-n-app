@@ -59,6 +59,10 @@ import {
   supabase,
 } from '@/lib/supabase';
 
+import {
+  syncAppleExternalPurchaseTokensSilently,
+} from '@/lib/appleExternalPurchaseService';
+
 /* =========================================================
  * Device gate types
  * ======================================================= */
@@ -973,6 +977,15 @@ export default function RootLayout() {
       false
     );
 
+  /*
+   * Prevent repeated launch-token writes for the same
+   * authenticated user during one app process.
+   */
+  const appleLaunchTokenSyncUserRef =
+    useRef<string | null>(
+      null
+    );
+
   const scanProcessingInitializationPromiseRef =
     useRef<
       Promise<void> | null
@@ -1447,6 +1460,185 @@ export default function RootLayout() {
     guideCompleted,
     deviceGate.status,
     disposeScanProcessing,
+  ]);
+
+  /* =======================================================
+   * Apple external-purchase tokens at app launch / sign-in
+   *
+   * EU ExternalPurchaseCustomLink requires ACQUISITION and
+   * SERVICES tokens to be requested at launch and associated
+   * with the authenticated customer account on the server.
+   *
+   * This is SILENT. Apple's disclosure is still shown only
+   * after deliberate user interaction in the payment flow.
+   * ===================================================== */
+
+  useEffect(() => {
+    if (
+      Platform.OS !==
+        'ios' ||
+      !sessionReady ||
+      hasSession !==
+        true
+    ) {
+      if (
+        hasSession ===
+          false
+      ) {
+        appleLaunchTokenSyncUserRef.current =
+          null;
+      }
+
+      return;
+    }
+
+    let active =
+      true;
+
+    async function syncAppleTokensAtLaunch():
+      Promise<void> {
+      try {
+        const {
+          data:
+            sessionData,
+          error:
+            sessionError,
+        } =
+          await supabase.auth
+            .getSession();
+
+        if (
+          sessionError
+        ) {
+          throw sessionError;
+        }
+
+        const session =
+          sessionData.session;
+
+        if (
+          !session ||
+          !active ||
+          !mountedRef.current
+        ) {
+          return;
+        }
+
+        if (
+          appleLaunchTokenSyncUserRef.current ===
+            session.user.id
+        ) {
+          return;
+        }
+
+        const appleResult =
+          await syncAppleExternalPurchaseTokensSilently();
+
+        if (
+          !appleResult.allowed
+        ) {
+          return;
+        }
+
+        const acquisitionToken =
+          appleResult
+            .acquisitionToken
+            ?.trim() ??
+          '';
+
+        const servicesToken =
+          appleResult
+            .servicesToken
+            ?.trim() ??
+          '';
+
+        if (
+          !acquisitionToken &&
+          !servicesToken
+        ) {
+          return;
+        }
+
+        const accessToken =
+          session
+            .access_token
+            ?.trim();
+
+        if (
+          !accessToken
+        ) {
+          return;
+        }
+
+        const {
+          data:
+            saveData,
+          error:
+            saveError,
+        } =
+          await supabase.functions
+            .invoke(
+              'save-apple-external-purchase-tokens',
+              {
+                body: {
+                  acquisitionToken:
+                    acquisitionToken ||
+                    undefined,
+
+                  servicesToken:
+                    servicesToken ||
+                    undefined,
+                },
+
+                headers: {
+                  Authorization:
+                    `Bearer ${accessToken}`,
+                },
+              }
+            );
+
+        if (
+          saveError
+        ) {
+          throw saveError;
+        }
+
+        if (
+          !saveData ||
+          saveData.success !==
+            true
+        ) {
+          throw new Error(
+            'APPLE_LAUNCH_TOKEN_SAVE_FAILED'
+          );
+        }
+
+        if (
+          active &&
+          mountedRef.current
+        ) {
+          appleLaunchTokenSyncUserRef.current =
+            session.user.id;
+        }
+      } catch (
+        error
+      ) {
+        console.log(
+          'APPLE LAUNCH TOKEN SYNC ERROR:',
+          error
+        );
+      }
+    }
+
+    void syncAppleTokensAtLaunch();
+
+    return () => {
+      active =
+        false;
+    };
+  }, [
+    sessionReady,
+    hasSession,
   ]);
 
   /* =======================================================

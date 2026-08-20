@@ -1,67 +1,108 @@
 {
-  "expo": {
-    "name": "Triple N",
-    "slug": "triple-n",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "triplen",
-    "userInterfaceStyle": "automatic",
-    "ios": {
-      "supportsTablet": false,
-      "bundleIdentifier": "com.naderahmed22.triplen",
-      "buildNumber": "1",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Triple N uses the camera to scan and add clothing items to your wardrobe.",
-        "NSPhotoLibraryAddUsageDescription": "Triple N saves outfit previews and exported images to your photo library.",
-        "NSLocationWhenInUseUsageDescription": "Triple N uses your approximate location to provide weather-based outfit suggestions."
-      }
-    },
-    "android": {
-      "versionCode": 1,
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#111111"
-      },
-      "predictiveBackGestureEnabled": false,
-      "package": "com.naderahmed22.triplen"
-    },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/favicon.png"
-    },
-    "plugins": [
-      "expo-router",
-      [
-        "expo-notifications",
-        {
-          "defaultChannel": "triple_n_scan_processing"
-        }
-      ],
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#111111",
-          "dark": {
-            "backgroundColor": "#111111"
-          }
-        }
-      ],
-      "expo-build-properties"
-    ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    },
-    "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "aa362496-ee43-4414-b837-141adf9a66af"
-      }
-    }
-  }
+    "expo":  {
+                 "name":  "Triple N",
+                 "slug":  "triple-n",
+                 "version":  "1.0.0",
+                 "orientation":  "portrait",
+                 "icon":  "./assets/images/icon.png",
+                 "scheme":  "triplen",
+                 "userInterfaceStyle":  "automatic",
+                 "ios":  {
+                             "supportsTablet":  false,
+                             "bundleIdentifier":  "com.naderahmed22.triplen",
+                             "buildNumber":  "1",
+                             "entitlements":  {
+                                                  "com.apple.developer.storekit.external-purchase-link":  true
+                                              },
+                             "infoPlist":  {
+                                               "ITSAppUsesNonExemptEncryption":  false,
+                                               "NSCameraUsageDescription":  "Triple N uses the camera to scan and add clothing items to your wardrobe.",
+                                               "NSPhotoLibraryAddUsageDescription":  "Triple N saves outfit previews and exported images to your photo library.",
+                                               "NSLocationWhenInUseUsageDescription":  "Triple N uses your approximate location to provide weather-based outfit suggestions.",
+                                               "SKExternalPurchaseCustomLinkRegions":  [
+                                                                                           "at",
+                                                                                           "be",
+                                                                                           "bg",
+                                                                                           "hr",
+                                                                                           "cy",
+                                                                                           "cz",
+                                                                                           "dk",
+                                                                                           "ee",
+                                                                                           "fi",
+                                                                                           "fr",
+                                                                                           "de",
+                                                                                           "gr",
+                                                                                           "hu",
+                                                                                           "ie",
+                                                                                           "it",
+                                                                                           "lv",
+                                                                                           "lt",
+                                                                                           "lu",
+                                                                                           "mt",
+                                                                                           "nl",
+                                                                                           "pl",
+                                                                                           "pt",
+                                                                                           "ro",
+                                                                                           "sk",
+                                                                                           "si",
+                                                                                           "es",
+                                                                                           "se"
+                                                                                       ]
+                                           }
+                         },
+                 "android":  {
+                                 "versionCode":  1,
+                                 "adaptiveIcon":  {
+                                                      "foregroundImage":  "./assets/images/icon.png",
+                                                      "backgroundColor":  "#111111"
+                                                  },
+                                 "predictiveBackGestureEnabled":  false,
+                                 "package":  "com.naderahmed22.triplen"
+                             },
+                 "web":  {
+                             "output":  "static",
+                             "favicon":  "./assets/images/favicon.png"
+                         },
+                 "plugins":  [
+                                 "expo-router",
+                                 [
+                                     "expo-notifications",
+                                     {
+                                         "defaultChannel":  "triple_n_scan_processing"
+                                     }
+                                 ],
+                                 [
+                                     "expo-splash-screen",
+                                     {
+                                         "image":  "./assets/images/splash-icon.png",
+                                         "imageWidth":  200,
+                                         "resizeMode":  "contain",
+                                         "backgroundColor":  "#111111",
+                                         "dark":  {
+                                                      "backgroundColor":  "#111111"
+                                                  }
+                                     }
+                                 ],
+                                 [
+                                     "expo-build-properties",
+                                     {
+                                         "ios":  {
+                                                     "deploymentTarget":  "18.1"
+                                                 }
+                                     }
+                                 ]
+                             ],
+                 "experiments":  {
+                                     "typedRoutes":  true,
+                                     "reactCompiler":  true
+                                 },
+                 "extra":  {
+                               "router":  {
+
+                                          },
+                               "eas":  {
+                                           "projectId":  "aa362496-ee43-4414-b837-141adf9a66af"
+                                       }
+                           }
+             }
 }

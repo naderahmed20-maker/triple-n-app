@@ -1,8 +1,9 @@
 {
-  "imports": {
-    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.57.4"
-  },
-  "compilerOptions": {
-    "strict": true
-  }
+    "nodeModulesDir":  "auto",
+    "imports":  {
+                    "jose":  "npm:jose@^6",
+                    "@supabase/supabase-js":  "npm:@supabase/supabase-js@^2",
+                    "stripe":  "npm:stripe@^22",
+                    "@supabase/functions-js":  "npm:@supabase/functions-js@^2"
+                }
 }

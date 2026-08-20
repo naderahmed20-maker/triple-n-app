@@ -96,7 +96,7 @@ export default function HelpCenterScreen() {
       );
 
     void openLink(
-      `mailto:support@triplen.ai?subject=${subject}`
+      `mailto:nader.ahmed20@icloud.com?subject=${subject}`
     );
   }
 
@@ -109,7 +109,7 @@ export default function HelpCenterScreen() {
       );
 
     void openLink(
-      `mailto:bugs@triplen.ai?subject=${subject}`
+      `mailto:nader.ahmed20@icloud.com?subject=${subject}`
     );
   }
 
@@ -243,7 +243,7 @@ export default function HelpCenterScreen() {
             )}
             onPress={() =>
               void openLink(
-                'https://triplen.ai/faq'
+                'https://naderahmed20-maker.github.io/triple-n-website/support.html'
               )
             }
           />
@@ -253,7 +253,7 @@ export default function HelpCenterScreen() {
             title={t(
               'helpCenter.supportTitle'
             )}
-            subtitle="support@triplen.ai"
+            subtitle="nader.ahmed20@icloud.com"
             onPress={
               openSupportEmail
             }
@@ -282,7 +282,7 @@ export default function HelpCenterScreen() {
             )}
             onPress={() =>
               void openLink(
-                'https://triplen.ai/privacy'
+                'https://naderahmed20-maker.github.io/triple-n-website/privacy.html'
               )
             }
           />
@@ -297,7 +297,7 @@ export default function HelpCenterScreen() {
             )}
             onPress={() =>
               void openLink(
-                'https://triplen.ai/terms'
+                'https://naderahmed20-maker.github.io/triple-n-website/terms.html'
               )
             }
             isLast

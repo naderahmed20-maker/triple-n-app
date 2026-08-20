@@ -37,7 +37,7 @@ export type PaymentEnvironment =
  */
 export const PAYMENT_ENVIRONMENT:
   PaymentEnvironment =
-    'development';
+    'production';
 
 /* =========================================================
  * Master switches
@@ -49,7 +49,7 @@ export const PAYMENT_ENVIRONMENT:
  * MUST remain false for now.
  */
 export const REAL_PAYMENTS_ENABLED =
-  false;
+  true;
 
 /**
  * Controls whether subscription/payment access is required
@@ -86,7 +86,7 @@ export const SUBSCRIPTION_GATE_ENFORCED =
  * This MUST be disabled before production.
  */
 export const ALLOW_DEVELOPMENT_CONTINUE =
-  true;
+  false;
 
 /* =========================================================
  * Plans
@@ -132,68 +132,62 @@ export type TripleNPlan = {
 export const TRIPLE_N_PLANS:
   readonly TripleNPlan[] = [
     {
-      id:
-        'monthly',
+  id:
+    'monthly',
 
-      name:
-        'Monthly',
+  name:
+    'Monthly',
 
-      /**
-       * Preview price only.
-       *
-       * Final production prices will come from the
-       * payment provider/store, not from UI hard-coding.
-       */
-      priceLabel:
-        '€4.99',
+  priceLabel:
+    '€1.00',
 
-      billingLabel:
-        'per month',
+  billingLabel:
+    'per month',
 
-      description:
-        'Full access with complete flexibility.',
+  description:
+    'Full access with complete flexibility.',
 
-      badge:
-        null,
+  badge:
+    null,
 
-      stripePriceId:
-        null,
+  stripePriceId:
+    null,
 
-      appleProductId:
-        null,
+  appleProductId:
+    null,
 
-      googleProductId:
-        null,
-    },
+  googleProductId:
+    null,
+},
 
     {
-      id:
-        'yearly',
+  id:
+    'yearly',
 
-      name:
-        'Yearly',
+  name:
+    'Yearly',
 
-      priceLabel:
-        '€39.99',
+  priceLabel:
+    '€12.00',
 
-      billingLabel:
-        'per year',
+  billingLabel:
+    'per year',
 
-      description:
-        'The best value for the complete Triple N experience.',
+  description:
+    'Full access billed once per year.',
 
-      badge:
-        'BEST VALUE',
+  badge:
+    null,
 
-      stripePriceId:
-        null,
+  stripePriceId:
+    null,
 
-      appleProductId:
-        null,
+  appleProductId:
+    null,
 
-      googleProductId:
-        null,
-    },
+  googleProductId:
+    null,
+},
   ] as const;
 
 /* =========================================================
@@ -201,9 +195,7 @@ export const TRIPLE_N_PLANS:
  * ======================================================= */
 
 export type PaymentProvider =
-  | 'stripe'
-  | 'apple'
-  | 'google';
+  | 'stripe';
 
 /**
  * IMPORTANT:
@@ -233,8 +225,6 @@ export type PaymentProvider =
 export const PAYMENT_PROVIDER_PRIORITY:
   readonly PaymentProvider[] = [
     'stripe',
-    'apple',
-    'google',
   ] as const;
 
 /* =========================================================

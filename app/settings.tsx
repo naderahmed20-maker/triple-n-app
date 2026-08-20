@@ -136,6 +136,11 @@ export default function SettingsScreen() {
     setResetting,
   ] = useState(false);
 
+  const [
+    deletingAccount,
+    setDeletingAccount,
+  ] = useState(false);
+
   useEffect(() => {
     void loadSettings();
   }, []);
@@ -436,7 +441,8 @@ export default function SettingsScreen() {
   async function saveSettings() {
     if (
       saving ||
-      resetting
+      resetting ||
+      deletingAccount
     ) {
       return;
     }
@@ -722,7 +728,8 @@ export default function SettingsScreen() {
   async function performReset() {
     if (
       resetting ||
-      saving
+      saving ||
+      deletingAccount
     ) {
       return;
     }
@@ -903,6 +910,161 @@ export default function SettingsScreen() {
     }
   }
 
+  async function performDeleteAccount() {
+    if (
+      deletingAccount ||
+      resetting ||
+      saving
+    ) {
+      return;
+    }
+
+    setDeletingAccount(
+      true
+    );
+
+    try {
+      const {
+        data: {
+          session,
+        },
+        error:
+          sessionError,
+      } =
+        await supabase.auth.getSession();
+
+      if (
+        sessionError
+      ) {
+        throw sessionError;
+      }
+
+      if (!session) {
+        router.replace(
+          '/login' as any
+        );
+
+        return;
+      }
+
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .functions
+          .invoke(
+            'delete-account',
+            {
+              body: {},
+            }
+          );
+
+      if (error) {
+        throw error;
+      }
+
+      if (
+        !data ||
+        data.success !== true ||
+        data.deleted !== true
+      ) {
+        throw new Error(
+          data?.message ||
+            data?.error ||
+            (
+              language ===
+              'Italian'
+                ? 'Impossibile eliminare l’account.'
+                : 'Unable to delete the account.'
+            )
+        );
+      }
+
+      await Notifications
+        .cancelAllScheduledNotificationsAsync();
+
+      await AsyncStorage.clear();
+
+      await changeLanguage(
+        'English'
+      );
+
+      try {
+        await supabase.auth.signOut({
+          scope:
+            'local',
+        });
+      } catch {
+        // The server-side account deletion already succeeded.
+      }
+
+      router.replace(
+        '/login' as any
+      );
+    } catch (
+      error: any
+    ) {
+      Alert.alert(
+        language ===
+          'Italian'
+          ? 'Eliminazione account non riuscita'
+          : 'Account deletion failed',
+
+        error?.message ||
+          (
+            language ===
+            'Italian'
+              ? 'Non è stato possibile eliminare il tuo account. Riprova.'
+              : 'Your account could not be deleted. Please try again.'
+          )
+      );
+
+      setDeletingAccount(
+        false
+      );
+    }
+  }
+
+  function deleteAccount() {
+    Alert.alert(
+      language ===
+        'Italian'
+        ? 'Elimina account'
+        : 'Delete Account',
+
+      language ===
+        'Italian'
+        ? 'Questa operazione eliminerà definitivamente il tuo account Triple N e i dati associati. Qualsiasi abbonamento Triple N attivo tramite Stripe verrà annullato prima dell’eliminazione. Questa operazione non può essere annullata.'
+        : 'This permanently deletes your Triple N account and associated data. Any active Triple N subscription through Stripe will be cancelled before deletion. This action cannot be undone.',
+
+      [
+        {
+          text:
+            t(
+              'common.cancel'
+            ),
+          style:
+            'cancel',
+        },
+        {
+          text:
+            language ===
+              'Italian'
+              ? 'Elimina account'
+              : 'Delete Account',
+
+          style:
+            'destructive',
+
+          onPress: () => {
+            void performDeleteAccount();
+          },
+        },
+      ]
+    );
+  }
+
   function openProblemReport():
     void {
     router.push(
@@ -911,11 +1073,11 @@ export default function SettingsScreen() {
   }
 
   function openPayment():
-  void {
-  router.push(
-    '/payment' as never
-  );
-}
+    void {
+    router.push(
+      '/payment' as never
+    );
+  }
 
   function resetAppData() {
     Alert.alert(
@@ -931,7 +1093,8 @@ export default function SettingsScreen() {
             t(
               'common.cancel'
             ),
-          style: 'cancel',
+          style:
+            'cancel',
         },
         {
           text:
@@ -1096,7 +1259,7 @@ export default function SettingsScreen() {
             }
           />
 
-<SettingRow
+          <SettingRow
             icon="globe"
             title={t(
               'settings.language'
@@ -1114,82 +1277,69 @@ export default function SettingsScreen() {
         </View>
 
         <TouchableOpacity
-  style={
-    styles.premiumCard
-  }
-  onPress={
-    openPayment
-  }
-  activeOpacity={
-    0.86
-  }
->
-  <View
-    style={
-      styles.premiumIcon
-    }
-  >
-    <Feather
-      name="star"
-      size={24}
-      color="#111111"
-    />
-  </View>
-
-  <View
-    style={
-      styles.premiumTextBox
-    }
-  >
-    <View
-      style={
-        styles.premiumTitleRow
-      }
-    >
-      <Text
-        style={
-          styles.premiumTitle
-        }
-      >
-        Triple N Premium
-      </Text>
-
-      <View
-        style={
-          styles.premiumComingSoon
-        }
-      >
-        <Text
           style={
-            styles.premiumComingSoonText
+            styles.premiumCard
+          }
+          onPress={
+            openPayment
+          }
+          activeOpacity={
+            0.86
           }
         >
-          SOON
-        </Text>
-      </View>
-    </View>
+          <View
+            style={
+              styles.premiumIcon
+            }
+          >
+            <Feather
+              name="star"
+              size={24}
+              color="#111111"
+            />
+          </View>
 
-    <Text
-      style={
-        styles.premiumSubtitle
-      }
-    >
-      Explore premium plans and the complete Triple N experience.
-    </Text>
-  </View>
+          <View
+            style={
+              styles.premiumTextBox
+            }
+          >
+            <View
+              style={
+                styles.premiumTitleRow
+              }
+            >
+              <Text
+                style={
+                  styles.premiumTitle
+                }
+              >
+                Triple N Premium
+              </Text>
 
-  <View
-    style={
-      styles.premiumArrow
-    }
-  >
-    <Feather
-      name="chevron-right"
-      size={22}
-      color="#f1d8c2"
-    />
-  </View>
-</TouchableOpacity>
+</View>
+
+            <Text
+              style={
+                styles.premiumSubtitle
+              }
+            >
+              Explore premium plans and the complete Triple N experience.
+            </Text>
+          </View>
+
+          <View
+            style={
+              styles.premiumArrow
+            }
+          >
+            <Feather
+              name="chevron-right"
+              size={22}
+              color="#f1d8c2"
+            />
+          </View>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={
@@ -1264,7 +1414,10 @@ export default function SettingsScreen() {
           style={[
             styles.saveButton,
 
-            saving &&
+            (
+              saving ||
+              deletingAccount
+            ) &&
               styles.disabledButton,
           ]}
           onPress={
@@ -1272,7 +1425,8 @@ export default function SettingsScreen() {
           }
           disabled={
             saving ||
-            resetting
+            resetting ||
+            deletingAccount
           }
         >
           {saving ? (
@@ -1304,7 +1458,10 @@ export default function SettingsScreen() {
           style={[
             styles.resetButton,
 
-            resetting &&
+            (
+              resetting ||
+              deletingAccount
+            ) &&
               styles.disabledButton,
           ]}
           onPress={
@@ -1312,7 +1469,8 @@ export default function SettingsScreen() {
           }
           disabled={
             resetting ||
-            saving
+            saving ||
+            deletingAccount
           }
         >
           {resetting ? (
@@ -1336,6 +1494,81 @@ export default function SettingsScreen() {
                   'settings.reset'
                 )}
               </Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.deleteAccountButton,
+
+            deletingAccount &&
+              styles.disabledButton,
+          ]}
+          onPress={
+            deleteAccount
+          }
+          disabled={
+            deletingAccount ||
+            resetting ||
+            saving
+          }
+          activeOpacity={
+            0.86
+          }
+          accessibilityRole="button"
+          accessibilityLabel={
+            language ===
+              'Italian'
+              ? 'Elimina account'
+              : 'Delete Account'
+          }
+          accessibilityHint={
+            language ===
+              'Italian'
+              ? 'Elimina definitivamente il tuo account Triple N e i dati associati.'
+              : 'Permanently deletes your Triple N account and associated data.'
+          }
+        >
+          {deletingAccount ? (
+            <ActivityIndicator
+              color="#ff5a5a"
+            />
+          ) : (
+            <>
+              <Feather
+                name="user-x"
+                size={20}
+                color="#ff5a5a"
+              />
+
+              <View
+                style={
+                  styles.deleteAccountTextBox
+                }
+              >
+                <Text
+                  style={
+                    styles.deleteAccountText
+                  }
+                >
+                  {language ===
+                    'Italian'
+                    ? 'Elimina account'
+                    : 'Delete Account'}
+                </Text>
+
+                <Text
+                  style={
+                    styles.deleteAccountSubtitle
+                  }
+                >
+                  {language ===
+                    'Italian'
+                    ? 'Elimina definitivamente account e dati'
+                    : 'Permanently delete account and data'}
+                </Text>
+              </View>
             </>
           )}
         </TouchableOpacity>
@@ -1817,121 +2050,62 @@ const styles =
     },
 
     problemReportCard: {
-      minHeight:
-        94,
-
-      marginTop:
-        22,
-
-      paddingHorizontal:
-        18,
-
-      paddingVertical:
-        16,
-
-      flexDirection:
-        'row',
-
-      alignItems:
-        'center',
-
-      borderWidth:
-        1,
-
+      minHeight: 94,
+      marginTop: 22,
+      paddingHorizontal: 18,
+      paddingVertical: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
       borderColor:
         'rgba(241, 216, 194, 0.28)',
-
-      borderRadius:
-        24,
-
+      borderRadius: 24,
       backgroundColor:
         '#15171c',
     },
 
     problemReportIcon: {
-      width:
-        50,
-
-      height:
-        50,
-
-      alignItems:
-        'center',
-
+      width: 50,
+      height: 50,
+      alignItems: 'center',
       justifyContent:
         'center',
-
-      borderRadius:
-        25,
-
+      borderRadius: 25,
       backgroundColor:
         '#f1d8c2',
     },
 
     problemReportTextBox: {
-      flex:
-        1,
-
-      marginLeft:
-        15,
-
-      paddingRight:
-        10,
+      flex: 1,
+      marginLeft: 15,
+      paddingRight: 10,
     },
 
     problemReportTitle: {
-      color:
-        '#ffffff',
-
-      fontSize:
-        16,
-
-      lineHeight:
-        22,
-
-      fontWeight:
-        '900',
+      color: '#ffffff',
+      fontSize: 16,
+      lineHeight: 22,
+      fontWeight: '900',
     },
 
     problemReportSubtitle: {
-      marginTop:
-        5,
-
-      color:
-        '#8f9299',
-
-      fontSize:
-        12,
-
-      lineHeight:
-        18,
-
-      fontWeight:
-        '600',
+      marginTop: 5,
+      color: '#8f9299',
+      fontSize: 12,
+      lineHeight: 18,
+      fontWeight: '600',
     },
 
     problemReportArrow: {
-      width:
-        34,
-
-      height:
-        34,
-
-      alignItems:
-        'center',
-
+      width: 34,
+      height: 34,
+      alignItems: 'center',
       justifyContent:
         'center',
-
-      borderWidth:
-        1,
-
+      borderWidth: 1,
       borderColor:
         '#30333a',
-
-      borderRadius:
-        17,
-
+      borderRadius: 17,
       backgroundColor:
         '#1d2026',
     },
@@ -1977,169 +2151,123 @@ const styles =
       marginLeft: 10,
     },
 
+    deleteAccountButton: {
+      minHeight: 68,
+      borderRadius: 22,
+      backgroundColor:
+        'rgba(255,90,90,0.07)',
+      borderWidth: 1,
+      borderColor:
+        'rgba(255,90,90,0.42)',
+      alignItems: 'center',
+      justifyContent:
+        'center',
+      flexDirection: 'row',
+      paddingHorizontal: 18,
+      marginTop: 14,
+    },
+
+    deleteAccountTextBox: {
+      marginLeft: 12,
+    },
+
+    deleteAccountText: {
+      color: '#ff5a5a',
+      fontSize: 16,
+      fontWeight: '900',
+    },
+
+    deleteAccountSubtitle: {
+      color: '#9b7777',
+      fontSize: 11,
+      fontWeight: '700',
+      marginTop: 3,
+    },
+
     disabledButton: {
       opacity: 0.55,
     },
 
     premiumCard: {
-  minHeight:
-    104,
+      minHeight: 104,
+      marginTop: 22,
+      paddingHorizontal: 18,
+      paddingVertical: 17,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor:
+        'rgba(241,216,194,0.42)',
+      borderRadius: 26,
+      backgroundColor:
+        '#15171c',
+    },
 
-  marginTop:
-    22,
+    premiumIcon: {
+      width: 52,
+      height: 52,
+      alignItems: 'center',
+      justifyContent:
+        'center',
+      borderRadius: 26,
+      backgroundColor:
+        '#f1d8c2',
+    },
 
-  paddingHorizontal:
-    18,
+    premiumTextBox: {
+      flex: 1,
+      marginLeft: 15,
+      paddingRight: 8,
+    },
 
-  paddingVertical:
-    17,
+    premiumTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+    },
 
-  flexDirection:
-    'row',
+    premiumTitle: {
+      color: '#ffffff',
+      fontSize: 16,
+      lineHeight: 22,
+      fontWeight: '900',
+    },
 
-  alignItems:
-    'center',
+    premiumComingSoon: {
+      marginLeft: 8,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      borderRadius: 999,
+      backgroundColor:
+        '#f1d8c2',
+    },
 
-  borderWidth:
-    1,
+    premiumComingSoonText: {
+      color: '#111111',
+      fontSize: 8,
+      fontWeight: '900',
+      letterSpacing: 0.7,
+    },
 
-  borderColor:
-    'rgba(241,216,194,0.42)',
+    premiumSubtitle: {
+      marginTop: 6,
+      color: '#8f9299',
+      fontSize: 12,
+      lineHeight: 18,
+      fontWeight: '600',
+    },
 
-  borderRadius:
-    26,
-
-  backgroundColor:
-    '#15171c',
-},
-
-premiumIcon: {
-  width:
-    52,
-
-  height:
-    52,
-
-  alignItems:
-    'center',
-
-  justifyContent:
-    'center',
-
-  borderRadius:
-    26,
-
-  backgroundColor:
-    '#f1d8c2',
-},
-
-premiumTextBox: {
-  flex:
-    1,
-
-  marginLeft:
-    15,
-
-  paddingRight:
-    8,
-},
-
-premiumTitleRow: {
-  flexDirection:
-    'row',
-
-  alignItems:
-    'center',
-
-  flexWrap:
-    'wrap',
-},
-
-premiumTitle: {
-  color:
-    '#ffffff',
-
-  fontSize:
-    16,
-
-  lineHeight:
-    22,
-
-  fontWeight:
-    '900',
-},
-
-premiumComingSoon: {
-  marginLeft:
-    8,
-
-  paddingHorizontal:
-    7,
-
-  paddingVertical:
-    3,
-
-  borderRadius:
-    999,
-
-  backgroundColor:
-    '#f1d8c2',
-},
-
-premiumComingSoonText: {
-  color:
-    '#111111',
-
-  fontSize:
-    8,
-
-  fontWeight:
-    '900',
-
-  letterSpacing:
-    0.7,
-},
-
-premiumSubtitle: {
-  marginTop:
-    6,
-
-  color:
-    '#8f9299',
-
-  fontSize:
-    12,
-
-  lineHeight:
-    18,
-
-  fontWeight:
-    '600',
-},
-
-premiumArrow: {
-  width:
-    34,
-
-  height:
-    34,
-
-  alignItems:
-    'center',
-
-  justifyContent:
-    'center',
-
-  borderWidth:
-    1,
-
-  borderColor:
-    '#30333a',
-
-  borderRadius:
-    17,
-
-  backgroundColor:
-    '#1d2026',
-},
+    premiumArrow: {
+      width: 34,
+      height: 34,
+      alignItems: 'center',
+      justifyContent:
+        'center',
+      borderWidth: 1,
+      borderColor:
+        '#30333a',
+      borderRadius: 17,
+      backgroundColor:
+        '#1d2026',
+    },
   });

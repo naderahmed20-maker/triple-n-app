@@ -1,4 +1,4 @@
-import "@supabase/functions-js/edge-runtime.d.ts";
+﻿import "@supabase/functions-js/edge-runtime.d.ts";
 
 import Stripe from "npm:stripe@^22";
 
@@ -15,13 +15,19 @@ import {
  * ======================================================= */
 
 const STRIPE_SECRET_KEY =
-  Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+  Deno.env.get(
+    "STRIPE_SECRET_KEY"
+  ) ?? "";
 
 const SUPABASE_URL =
-  Deno.env.get("SUPABASE_URL") ?? "";
+  Deno.env.get(
+    "SUPABASE_URL"
+  ) ?? "";
 
 const SUPABASE_ANON_KEY =
-  Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+  Deno.env.get(
+    "SUPABASE_ANON_KEY"
+  ) ?? "";
 
 /* =========================================================
  * Triple N website
@@ -42,7 +48,14 @@ const stripe =
 /* =========================================================
  * Plans
  *
- * Prices are defined server-side.
+ * Prices are server-side and represent PRE-TAX prices.
+ *
+ * Monthly:
+ * EUR 1.00 + applicable VAT/tax
+ *
+ * Yearly:
+ * EUR 12.00 + applicable VAT/tax
+ *
  * The mobile app is NEVER trusted to provide an amount.
  * ======================================================= */
 
@@ -71,7 +84,7 @@ const PLANS:
   > = {
     monthly: {
       amount:
-        499,
+        100,
 
       interval:
         "month",
@@ -85,7 +98,7 @@ const PLANS:
 
     yearly: {
       amount:
-        3999,
+        1200,
 
       interval:
         "year",
@@ -122,14 +135,20 @@ const corsHeaders = {
 
 function jsonResponse(
   body:
-    Record<string, unknown>,
+    Record<
+      string,
+      unknown
+    >,
   status =
     200
 ): Response {
   return new Response(
-    JSON.stringify(body),
+    JSON.stringify(
+      body
+    ),
     {
       status,
+
       headers:
         corsHeaders,
     }
@@ -325,7 +344,8 @@ Deno.serve(
 
     try {
       body =
-        await req.json();
+        await req
+          .json();
     } catch {
       return jsonResponse(
         {
@@ -373,7 +393,7 @@ Deno.serve(
           "subscriptions"
         )
         .select(
-          "status, current_period_end"
+          "status, current_period_end, provider, provider_subscription_id"
         )
         .eq(
           "user_id",
@@ -386,7 +406,8 @@ Deno.serve(
     ) {
       console.warn(
         "Unable to check existing subscription:",
-        subscriptionLookupError.message
+        subscriptionLookupError
+          .message
       );
     }
 
@@ -406,8 +427,31 @@ Deno.serve(
         ).getTime() >
           Date.now();
 
+      const hasRealStripeSubscription =
+        existingSubscription
+          .provider ===
+          "stripe" &&
+        typeof existingSubscription
+          .provider_subscription_id ===
+          "string" &&
+        existingSubscription
+          .provider_subscription_id
+          .trim()
+          .length >
+          0;
+
+      /*
+       * Block duplicate checkout ONLY when Supabase contains
+       * a real Stripe-backed active subscription.
+       *
+       * Legacy development-access rows may have status=active
+       * without a Stripe subscription ID. Those rows must not
+       * prevent the user from purchasing a real subscription.
+       */
+
       if (
-        stillActive
+        stillActive &&
+        hasRealStripeSubscription
       ) {
         return jsonResponse(
           {
@@ -415,6 +459,28 @@ Deno.serve(
               "SUBSCRIPTION_ALREADY_ACTIVE",
           },
           409
+        );
+      }
+
+      if (
+        stillActive &&
+        !hasRealStripeSubscription
+      ) {
+        console.warn(
+          "Ignoring legacy/non-Stripe active subscription row:",
+          {
+            userId:
+              user.id,
+
+            provider:
+              existingSubscription
+                .provider,
+
+            providerSubscriptionId:
+              existingSubscription
+                .provider_subscription_id ??
+              null,
+          }
         );
       }
     }
@@ -435,9 +501,41 @@ Deno.serve(
             client_reference_id:
               user.id,
 
+            /*
+             * Stripe may create the Customer for subscription
+             * Checkout if one isn't already supplied.
+             */
+
             customer_email:
               user.email ??
               undefined,
+
+            /*
+             * Stripe Tax
+             *
+             * This enables real automatic tax calculation.
+             *
+             * The plan prices remain exclusive of tax.
+             * Applicable VAT/tax is added on top according
+             * to Stripe's tax calculation and customer location.
+             */
+
+            automatic_tax: {
+              enabled:
+                true,
+            },
+
+            /*
+             * Require billing address so Stripe has strong
+             * customer-location evidence for tax calculation.
+             */
+
+            billing_address_collection:
+              "required",
+
+            /* -------------------------------------------------
+             * Subscription item
+             * ----------------------------------------------- */
 
             line_items: [
               {
@@ -448,8 +546,23 @@ Deno.serve(
                   currency:
                     "eur",
 
+                  /*
+                   * Amounts are in cents.
+                   *
+                   * monthly = 100  -> EUR 1.00
+                   * yearly  = 1200 -> EUR 12.00
+                   */
+
                   unit_amount:
                     plan.amount,
+
+                  /*
+                   * VAT/tax is added on TOP of the configured
+                   * Triple N price.
+                   */
+
+                  tax_behavior:
+                    "exclusive",
 
                   recurring: {
                     interval:
@@ -462,10 +575,25 @@ Deno.serve(
 
                     description:
                       plan.description,
+
+                    /*
+                     * Stripe product tax code.
+                     *
+                     * This classifies the digital service.
+                     * automatic_tax above performs the actual
+                     * tax calculation.
+                     */
+
+                    tax_code:
+                      "txcd_10103100",
                   },
                 },
               },
             ],
+
+            /* -------------------------------------------------
+             * Checkout Session metadata
+             * ----------------------------------------------- */
 
             metadata: {
               triple_n_user_id:
@@ -474,6 +602,13 @@ Deno.serve(
               triple_n_plan_id:
                 planId,
             },
+
+            /* -------------------------------------------------
+             * Subscription metadata
+             *
+             * This is retained on the Stripe Subscription and
+             * lets webhook renewals map back to Triple N.
+             * ----------------------------------------------- */
 
             subscription_data: {
               metadata: {
@@ -485,9 +620,9 @@ Deno.serve(
               },
             },
 
-            /*
-             * Real public HTTPS return URLs.
-             */
+            /* -------------------------------------------------
+             * Public HTTPS return URLs
+             * ----------------------------------------------- */
 
             success_url:
               `${TRIPLE_N_WEBSITE_URL}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
@@ -497,7 +632,7 @@ Deno.serve(
           });
 
       /* ---------------------------------------------------
-       * Stripe must return a hosted Checkout URL.
+       * Stripe must return a hosted Checkout URL
        * ------------------------------------------------- */
 
       if (
@@ -527,6 +662,12 @@ Deno.serve(
             user.id,
 
           planId,
+
+          automaticTax:
+            true,
+
+          taxBehavior:
+            "exclusive",
         }
       );
 
@@ -556,10 +697,102 @@ Deno.serve(
         error
       );
 
+      const stripeError =
+        error &&
+        typeof error ===
+          "object"
+          ? error as {
+              type?:
+                unknown;
+
+              code?:
+                unknown;
+
+              message?:
+                unknown;
+
+              param?:
+                unknown;
+
+              requestId?:
+                unknown;
+            }
+          : null;
+
+      const stripeType =
+        typeof stripeError
+          ?.type ===
+          "string"
+          ? stripeError
+              .type
+          : null;
+
+      const stripeCode =
+        typeof stripeError
+          ?.code ===
+          "string"
+          ? stripeError
+              .code
+          : null;
+
+      const stripeMessage =
+        typeof stripeError
+          ?.message ===
+          "string"
+          ? stripeError
+              .message
+          : null;
+
+      const stripeParam =
+        typeof stripeError
+          ?.param ===
+          "string"
+          ? stripeError
+              .param
+          : null;
+
+      const stripeRequestId =
+        typeof stripeError
+          ?.requestId ===
+          "string"
+          ? stripeError
+              .requestId
+          : null;
+
+      console.error(
+        "Stripe diagnostic:",
+        {
+          type:
+            stripeType,
+
+          code:
+            stripeCode,
+
+          message:
+            stripeMessage,
+
+          param:
+            stripeParam,
+
+          requestId:
+            stripeRequestId,
+        }
+      );
+
       return jsonResponse(
         {
           error:
             "STRIPE_CHECKOUT_FAILED",
+
+          stripeType,
+
+          stripeCode,
+
+          stripeMessage,
+
+          stripeParam,
+
+          stripeRequestId,
         },
         500
       );

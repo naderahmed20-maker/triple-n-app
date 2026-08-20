@@ -1,11 +1,19 @@
 // lib/paymentFlowService.ts
 
 import {
+  Platform,
+} from 'react-native';
+
+import {
   PAYMENT_ENVIRONMENT,
   REAL_PAYMENTS_ENABLED,
   type PaymentProvider,
   type TripleNPlanId,
 } from '@/lib/paymentConfig';
+
+import {
+  prepareAppleExternalPurchase,
+} from '@/lib/appleExternalPurchaseService';
 
 import {
   isCheckoutCancelled,
@@ -17,6 +25,10 @@ import {
 import {
   grantDevelopmentPaymentAccess,
 } from '@/lib/subscriptionService';
+
+import {
+  supabase,
+} from '@/lib/supabase';
 
 import type {
   PaymentCheckoutResult,
@@ -116,6 +128,384 @@ function createFailedCheckout(
 }
 
 /* =========================================================
+ * Apple error message
+ * ======================================================= */
+
+function getAppleExternalPurchaseErrorMessage(
+  reason:
+    string | null
+): string {
+  switch (
+    reason
+  ) {
+    case 'payments-not-allowed':
+      return 'Purchases are not allowed for this Apple account or device.';
+
+    case 'api-unavailable':
+      return 'This payment option is not available on this version of iOS.';
+
+    case 'not-eligible':
+      return 'This payment option is not available for your App Store region.';
+
+    case 'token-ineligible':
+      return 'Apple could not prepare this purchase for your account.';
+
+    case 'payments-not-allowed':
+      return 'Purchases are not allowed on this device.';
+
+    default:
+      return 'Apple could not prepare the external purchase. Please try again.';
+  }
+}
+
+/* =========================================================
+ * Save Apple external-purchase tokens
+ * ======================================================= */
+
+async function saveAppleExternalPurchaseTokens(
+  acquisitionToken:
+    string,
+  servicesToken:
+    string
+): Promise<void> {
+  const normalizedAcquisitionToken =
+    acquisitionToken
+      .trim();
+
+  const normalizedServicesToken =
+    servicesToken
+      .trim();
+
+  if (
+    !normalizedAcquisitionToken ||
+    !normalizedServicesToken
+  ) {
+    throw new Error(
+      'APPLE_EXTERNAL_PURCHASE_TOKEN_MISSING'
+    );
+  }
+
+  /* -------------------------------------------------------
+   * Resolve authenticated session
+   * ----------------------------------------------------- */
+
+  const {
+    data:
+      sessionData,
+    error:
+      sessionError,
+  } =
+    await supabase.auth
+      .getSession();
+
+  if (
+    sessionError
+  ) {
+    throw sessionError;
+  }
+
+  const accessToken =
+    sessionData
+      .session
+      ?.access_token
+      ?.trim();
+
+  if (
+    !accessToken
+  ) {
+    throw new Error(
+      'AUTHENTICATED_USER_REQUIRED'
+    );
+  }
+
+  /* -------------------------------------------------------
+   * Save tokens through secure Edge Function
+   * ----------------------------------------------------- */
+
+  const {
+    data:
+      saveData,
+    error:
+      saveError,
+  } =
+    await supabase.functions
+      .invoke(
+        'save-apple-external-purchase-tokens',
+        {
+          body: {
+            acquisitionToken:
+              normalizedAcquisitionToken,
+
+            servicesToken:
+              normalizedServicesToken,
+          },
+
+          headers: {
+            Authorization:
+              `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+  if (
+    saveError
+  ) {
+    console.error(
+      'APPLE EXTERNAL PURCHASE TOKEN SAVE ERROR:',
+      saveError
+    );
+
+    throw new Error(
+      'APPLE_EXTERNAL_PURCHASE_TOKEN_STORAGE_FAILED'
+    );
+  }
+
+  if (
+    !saveData ||
+    saveData.success !==
+      true ||
+    saveData.saved !==
+      true
+  ) {
+    console.error(
+      'APPLE EXTERNAL PURCHASE TOKEN SAVE INVALID RESPONSE:',
+      saveData
+    );
+
+    throw new Error(
+      'APPLE_EXTERNAL_PURCHASE_TOKEN_STORAGE_FAILED'
+    );
+  }
+}
+
+/* =========================================================
+ * Apple external-purchase gate
+ * ======================================================= */
+
+async function prepareProductionAppleCheckout(
+  planId:
+    TripleNPlanId
+): Promise<PaymentFlowResult | null> {
+
+  /*
+   * Android does not use Apple's StoreKit gate.
+   */
+  if (
+    Platform.OS !==
+      'ios'
+  ) {
+    return null;
+  }
+
+  const appleResult =
+    await prepareAppleExternalPurchase();
+
+  /* -------------------------------------------------------
+   * User cancelled Apple's disclosure
+   * ----------------------------------------------------- */
+
+  if (
+    !appleResult.allowed &&
+    appleResult.reason ===
+      'cancelled'
+  ) {
+    const checkout =
+      createFailedCheckout(
+        planId,
+        'APPLE_EXTERNAL_PURCHASE_CANCELLED',
+        'The purchase was cancelled.'
+      );
+
+    return {
+      status:
+        'cancelled',
+
+      allowAppEntry:
+        false,
+
+      provider:
+        null,
+
+      planId,
+
+      checkout,
+
+      developmentBypass:
+        false,
+
+      errorCode:
+        null,
+
+      errorMessage:
+        null,
+    };
+  }
+
+  /* -------------------------------------------------------
+   * Apple did not allow external purchase
+   * ----------------------------------------------------- */
+
+  if (
+    !appleResult.allowed
+  ) {
+    const errorCode =
+      appleResult.reason
+        ? `APPLE_EXTERNAL_PURCHASE_${appleResult.reason
+            .replace(
+              /-/g,
+              '_'
+            )
+            .toUpperCase()}`
+        : 'APPLE_EXTERNAL_PURCHASE_FAILED';
+
+    const errorMessage =
+      getAppleExternalPurchaseErrorMessage(
+        appleResult.reason
+      );
+
+    const checkout =
+      createFailedCheckout(
+        planId,
+        errorCode,
+        errorMessage
+      );
+
+    return {
+      status:
+        'failed',
+
+      allowAppEntry:
+        false,
+
+      provider:
+        null,
+
+      planId,
+
+      checkout,
+
+      developmentBypass:
+        false,
+
+      errorCode,
+      errorMessage,
+    };
+  }
+
+  /* -------------------------------------------------------
+   * Apple allowed external purchase.
+   *
+   * On iOS production both Apple tokens must exist.
+   * ----------------------------------------------------- */
+
+  const acquisitionToken =
+    appleResult
+      .acquisitionToken
+      ?.trim() ??
+    '';
+
+  const servicesToken =
+    appleResult
+      .servicesToken
+      ?.trim() ??
+    '';
+
+  if (
+    !acquisitionToken ||
+    !servicesToken
+  ) {
+    const checkout =
+      createFailedCheckout(
+        planId,
+        'APPLE_EXTERNAL_PURCHASE_TOKEN_MISSING',
+        'Apple could not prepare this purchase. Please try again.'
+      );
+
+    return {
+      status:
+        'failed',
+
+      allowAppEntry:
+        false,
+
+      provider:
+        null,
+
+      planId,
+
+      checkout,
+
+      developmentBypass:
+        false,
+
+      errorCode:
+        checkout.errorCode,
+
+      errorMessage:
+        checkout.errorMessage,
+    };
+  }
+
+  /* -------------------------------------------------------
+   * Persist Apple tokens before creating Stripe checkout
+   * ----------------------------------------------------- */
+
+  try {
+    await saveAppleExternalPurchaseTokens(
+      acquisitionToken,
+      servicesToken
+    );
+  } catch (
+    error:
+      unknown
+  ) {
+    console.error(
+      'APPLE EXTERNAL PURCHASE PREPARATION ERROR:',
+      error
+    );
+
+    const checkout =
+      createFailedCheckout(
+        planId,
+        'APPLE_EXTERNAL_PURCHASE_TOKEN_STORAGE_FAILED',
+        'The purchase could not be prepared securely. Please try again.'
+      );
+
+    return {
+      status:
+        'failed',
+
+      allowAppEntry:
+        false,
+
+      provider:
+        null,
+
+      planId,
+
+      checkout,
+
+      developmentBypass:
+        false,
+
+      errorCode:
+        checkout.errorCode,
+
+      errorMessage:
+        checkout.errorMessage,
+    };
+  }
+
+  /*
+   * null means:
+   *
+   * Apple gate passed.
+   * Continue to the existing checkout flow.
+   */
+  return null;
+}
+
+/* =========================================================
  * Main payment flow
  * ======================================================= */
 
@@ -169,7 +559,46 @@ export async function startPaymentFlow(
 
   try {
     /* -----------------------------------------------------
-     * Start checkout
+     * Development bypass status
+     * --------------------------------------------------- */
+
+    const developmentBypass =
+      isDevelopmentBypassCheckout();
+
+    /* -----------------------------------------------------
+     * Apple production external-purchase gate
+     *
+     * Production iOS:
+     *
+     * canMakePayments
+     *   -> eligibility
+     *   -> Apple tokens
+     *   -> Apple disclosure
+     *   -> secure token storage
+     *   -> Stripe checkout
+     *
+     * Development bypass:
+     *
+     * Skip StoreKit external-purchase flow.
+     * --------------------------------------------------- */
+
+    if (
+      !developmentBypass
+    ) {
+      const appleGateResult =
+        await prepareProductionAppleCheckout(
+          input.planId
+        );
+
+      if (
+        appleGateResult
+      ) {
+        return appleGateResult;
+      }
+    }
+
+    /* -----------------------------------------------------
+     * Start existing checkout
      * --------------------------------------------------- */
 
     const checkout =
@@ -291,9 +720,6 @@ export async function startPaymentFlow(
      * Development bypass
      * --------------------------------------------------- */
 
-    const developmentBypass =
-      isDevelopmentBypassCheckout();
-
     if (
       developmentBypass
     ) {
@@ -375,6 +801,11 @@ export async function startPaymentFlow(
     error:
       unknown
   ) {
+    console.error(
+      'PAYMENT FLOW ERROR:',
+      error
+    );
+
     const errorMessage =
       error instanceof Error
         ? error.message

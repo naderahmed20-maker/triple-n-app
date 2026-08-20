@@ -2,53 +2,36 @@
 //
 // Triple N - Edit Wardrobe Item
 //
-// تعديل بيانات القطعة وتغيير صورتها.
+// Ã˜ÂªÃ˜Â¹Ã˜Â¯Ã™Å Ã™â€ž Ã˜Â¨Ã™Å Ã˜Â§Ã™â€ Ã˜Â§Ã˜Âª Ã˜Â§Ã™â€žÃ™â€šÃ˜Â·Ã˜Â¹Ã˜Â© Ã™Ë†Ã˜ÂªÃ˜ÂºÃ™Å Ã™Å Ã˜Â± Ã˜ÂµÃ™Ë†Ã˜Â±Ã˜ÂªÃ™â€¡Ã˜Â§.
 //
-// عند تغيير الصورة:
+// Ã˜Â¹Ã™â€ Ã˜Â¯ Ã˜ÂªÃ˜ÂºÃ™Å Ã™Å Ã˜Â± Ã˜Â§Ã™â€žÃ˜ÂµÃ™Ë†Ã˜Â±Ã˜Â©:
 //
-// 1) تجهيز نسخة محلية مناسبة لـEdgeSAM.
-// 2) رفع الصورة الأصلية للتخزين.
-// 3) تحديث القطعة إلى queued.
-// 4) إنشاء Processing Job.
-// 5) إدخال الصورة إلى Scan Item Queue.
-// 6) EdgeSAM يعالجها محليًا.
-// 7) LocalScanItemProcessingAdapter يحدث القطعة
-//    بالصورة الشفافة النهائية.
+// 1) Ã˜ÂªÃ˜Â¬Ã™â€¡Ã™Å Ã˜Â² Ã™â€ Ã˜Â³Ã˜Â®Ã˜Â© Ã™â€¦Ã˜Â­Ã™â€žÃ™Å Ã˜Â© Ã™â€¦Ã™â€ Ã˜Â§Ã˜Â³Ã˜Â¨Ã˜Â© Ã™â€žÃ™â‚¬EdgeSAM.
+// 2) Ã˜Â±Ã™ÂÃ˜Â¹ Ã˜Â§Ã™â€žÃ˜ÂµÃ™Ë†Ã˜Â±Ã˜Â© Ã˜Â§Ã™â€žÃ˜Â£Ã˜ÂµÃ™â€žÃ™Å Ã˜Â© Ã™â€žÃ™â€žÃ˜ÂªÃ˜Â®Ã˜Â²Ã™Å Ã™â€ .
+// 3) Ã˜ÂªÃ˜Â­Ã˜Â¯Ã™Å Ã˜Â« Ã˜Â§Ã™â€žÃ™â€šÃ˜Â·Ã˜Â¹Ã˜Â© Ã˜Â¥Ã™â€žÃ™â€° queued.
+// 4) Ã˜Â¥Ã™â€ Ã˜Â´Ã˜Â§Ã˜Â¡ Processing Job.
+// 5) Ã˜Â¥Ã˜Â¯Ã˜Â®Ã˜Â§Ã™â€ž Ã˜Â§Ã™â€žÃ˜ÂµÃ™Ë†Ã˜Â±Ã˜Â© Ã˜Â¥Ã™â€žÃ™â€° Scan Item Queue.
+// 6) EdgeSAM Ã™Å Ã˜Â¹Ã˜Â§Ã™â€žÃ˜Â¬Ã™â€¡Ã˜Â§ Ã™â€¦Ã˜Â­Ã™â€žÃ™Å Ã™â€¹Ã˜Â§.
+// 7) LocalScanItemProcessingAdapter Ã™Å Ã˜Â­Ã˜Â¯Ã˜Â« Ã˜Â§Ã™â€žÃ™â€šÃ˜Â·Ã˜Â¹Ã˜Â©
+//    Ã˜Â¨Ã˜Â§Ã™â€žÃ˜ÂµÃ™Ë†Ã˜Â±Ã˜Â© Ã˜Â§Ã™â€žÃ˜Â´Ã™ÂÃ˜Â§Ã™ÂÃ˜Â© Ã˜Â§Ã™â€žÃ™â€ Ã™â€¡Ã˜Â§Ã˜Â¦Ã™Å Ã˜Â©.
 //
 // Summer V1:
 //
-// - لا توجد Jackets.
-// - لا توجد أي بيانات شتوية.
-// - season وoccasion داخل Job تكون null.
+// - Ã™â€žÃ˜Â§ Ã˜ÂªÃ™Ë†Ã˜Â¬Ã˜Â¯ Jackets.
+// - Ã™â€žÃ˜Â§ Ã˜ÂªÃ™Ë†Ã˜Â¬Ã˜Â¯ Ã˜Â£Ã™Å  Ã˜Â¨Ã™Å Ã˜Â§Ã™â€ Ã˜Â§Ã˜Âª Ã˜Â´Ã˜ÂªÃ™Ë†Ã™Å Ã˜Â©.
+// - season Ã™Ë†occasion Ã˜Â¯Ã˜Â§Ã˜Â®Ã™â€ž Job Ã˜ÂªÃ™Æ’Ã™Ë†Ã™â€  null.
 
 import {
   useTranslation,
 } from '@/lib/i18n';
 
-import {
-  uploadWardrobeImage,
-} from '@/lib/storageService';
 
 import {
-  getCurrentUser,
   getMyWardrobeItems,
   updateWardrobeItem,
   type WardrobeItem,
 } from '@/lib/wardrobeService';
 
-import {
-  getDefaultScanItemQueueService,
-} from '@/scan/core/services/ScanItemQueueService';
-
-import {
-  createProcessingBatchId,
-  type CreateProcessingJobRequest,
-  type ProcessingImageSource,
-  type ProcessingWardrobeMetadata,
-} from '@/scan/core/queue/QueueTypes';
-
-import * as ImageManipulator from 'expo-image-manipulator';
-import * as ImagePicker from 'expo-image-picker';
 
 import {
   router,
@@ -102,29 +85,6 @@ type EditableCategory =
 type EditableColor =
   (typeof COLORS)[number];
 
-/* =========================================================
- * Selected local image
- * ======================================================= */
-
-type SelectedLocalImage = {
-  uri:
-    string;
-
-  width:
-    number;
-
-  height:
-    number;
-
-  fileName:
-    string | null;
-
-  mimeType:
-    string;
-
-  assetId:
-    string | null;
-};
 
 /* =========================================================
  * Helpers
@@ -159,158 +119,12 @@ function getUnknownErrorMessage(
       return serialized;
     }
   } catch {
-    // نستخدم String في النهاية.
+    // Ã™â€ Ã˜Â³Ã˜ÂªÃ˜Â®Ã˜Â¯Ã™â€¦ String Ã™ÂÃ™Å  Ã˜Â§Ã™â€žÃ™â€ Ã™â€¡Ã˜Â§Ã™Å Ã˜Â©.
   }
 
   return String(
     error
   );
-}
-
-function normalizePositiveDimension(
-  value:
-    number | null | undefined
-): number | null {
-  if (
-    typeof value !==
-      'number' ||
-    !Number.isFinite(
-      value
-    ) ||
-    value <=
-      0
-  ) {
-    return null;
-  }
-
-  return Math.max(
-    1,
-    Math.floor(
-      value
-    )
-  );
-}
-
-function createQueueSource(
-  image:
-    SelectedLocalImage
-): ProcessingImageSource {
-  const createdAt =
-    Date.now();
-
-  return {
-    uri:
-      image.uri,
-
-    kind:
-      'photo-library',
-
-    width:
-      normalizePositiveDimension(
-        image.width
-      ),
-
-    height:
-      normalizePositiveDimension(
-        image.height
-      ),
-
-    format:
-      'jpeg',
-
-    orientation:
-      null,
-
-    fileName:
-      image.fileName,
-
-    mimeType:
-      image.mimeType,
-
-    fileSizeBytes:
-      null,
-
-    assetId:
-      image.assetId,
-
-    segmentationSourceId:
-      [
-        'edit-item',
-        createdAt
-          .toString(
-            36
-          ),
-      ].join(
-        '-'
-      ),
-
-    createdAt,
-
-    metadata: {
-      source:
-        'edit-item',
-
-      imageChanged:
-        true,
-
-      processedLocally:
-        true,
-    },
-  };
-}
-
-function createWardrobeMetadata(
-  input: {
-    category:
-      EditableCategory;
-
-    itemName:
-      string;
-
-    color:
-      EditableColor;
-
-    subcategory:
-      string | null;
-  }
-): ProcessingWardrobeMetadata {
-  return {
-    wardrobeType:
-      null,
-
-    category:
-      input.category,
-
-    subcategory:
-      input.subcategory,
-
-    itemName:
-      input.itemName ||
-      null,
-
-    color:
-      input.color,
-
-    style:
-      null,
-
-    season:
-      null,
-
-    occasion:
-      null,
-
-    isFavorite:
-      false,
-
-    metadata: {
-      source:
-        'edit-item',
-
-      summerMode:
-        true,
-    },
-  };
 }
 
 /* =========================================================
@@ -355,24 +169,7 @@ export default function EditItemScreen() {
     useState(
       ''
     );
-
-  const [
-    originalImage,
-    setOriginalImage,
-  ] =
-    useState(
-      ''
-    );
-
-  const [
-    selectedLocalImage,
-    setSelectedLocalImage,
-  ] =
-    useState<SelectedLocalImage | null>(
-      null
-    );
-
-  const [
+const [
     name,
     setName,
   ] =
@@ -472,22 +269,11 @@ export default function EditItemScreen() {
           item.image ||
           ''
         );
-
-        setOriginalImage(
-          item.image ||
-          ''
-        );
-
-        setName(
+setName(
           item.name ||
           ''
         );
-
-        setSelectedLocalImage(
-          null
-        );
-
-        if (
+if (
           CATEGORIES.includes(
             item.category as
               EditableCategory
@@ -499,8 +285,8 @@ export default function EditItemScreen() {
           );
         } else {
           /**
-           * أي Jacket قديمة لن تبقى كفئة
-           * قابلة للاختيار داخل Summer V1.
+           * Ã˜Â£Ã™Å  Jacket Ã™â€šÃ˜Â¯Ã™Å Ã™â€¦Ã˜Â© Ã™â€žÃ™â€  Ã˜ÂªÃ˜Â¨Ã™â€šÃ™â€° Ã™Æ’Ã™ÂÃ˜Â¦Ã˜Â©
+           * Ã™â€šÃ˜Â§Ã˜Â¨Ã™â€žÃ˜Â© Ã™â€žÃ™â€žÃ˜Â§Ã˜Â®Ã˜ÂªÃ™Å Ã˜Â§Ã˜Â± Ã˜Â¯Ã˜Â§Ã˜Â®Ã™â€ž Summer V1.
            */
           setCategory(
             'Tops'
@@ -671,143 +457,6 @@ export default function EditItemScreen() {
     );
   }
 
-  /* =======================================================
-   * Select replacement photo
-   * ===================================================== */
-
-  async function changePhoto():
-    Promise<void> {
-    if (
-      saving ||
-      loading
-    ) {
-      return;
-    }
-
-    try {
-      const permission =
-        await ImagePicker
-          .requestMediaLibraryPermissionsAsync();
-
-      if (
-        !permission.granted
-      ) {
-        Alert.alert(
-          t(
-            'addItem.photosPermission'
-          ),
-          t(
-            'addItem.photosPermissionMessage'
-          )
-        );
-
-        return;
-      }
-
-      const result =
-        await ImagePicker
-          .launchImageLibraryAsync({
-            mediaTypes: [
-              'images',
-            ],
-
-            allowsMultipleSelection:
-              false,
-
-            quality:
-              1,
-          });
-
-      const selectedAsset =
-        result.assets?.[0];
-
-      if (
-        result.canceled ||
-        !selectedAsset
-      ) {
-        return;
-      }
-
-      const converted =
-        await ImageManipulator
-          .manipulateAsync(
-            selectedAsset.uri,
-            [
-              {
-                resize: {
-                  width:
-                    1280,
-                },
-              },
-            ],
-            {
-              compress:
-                0.9,
-
-              format:
-                ImageManipulator
-                  .SaveFormat
-                  .JPEG,
-            }
-          );
-
-      const convertedWidth =
-        normalizePositiveDimension(
-          converted.width
-        ) ??
-        normalizePositiveDimension(
-          selectedAsset.width
-        ) ??
-        1;
-
-      const convertedHeight =
-        normalizePositiveDimension(
-          converted.height
-        ) ??
-        normalizePositiveDimension(
-          selectedAsset.height
-        ) ??
-        1;
-
-      setSelectedLocalImage({
-        uri:
-          converted.uri,
-
-        width:
-          convertedWidth,
-
-        height:
-          convertedHeight,
-
-        fileName:
-          selectedAsset.fileName ??
-          `edit-item-${Date.now()}.jpg`,
-
-        mimeType:
-          'image/jpeg',
-
-        assetId:
-          selectedAsset.assetId ??
-          null,
-      });
-
-      setImage(
-        converted.uri
-      );
-    } catch (error) {
-      Alert.alert(
-        t(
-          'addItem.photoError'
-        ),
-        getUnknownErrorMessage(
-          error
-        ) ||
-        t(
-          'addItem.photoErrorMessage'
-        )
-      );
-    }
-  }
 
   /* =======================================================
    * Save metadata only
@@ -834,8 +483,8 @@ export default function EditItemScreen() {
         category,
 
         /**
-         * لا نحتفظ بـsubcategory قديمة
-         * إذا تغيرت الفئة الأساسية.
+         * Ã™â€žÃ˜Â§ Ã™â€ Ã˜Â­Ã˜ÂªÃ™ÂÃ˜Â¸ Ã˜Â¨Ã™â‚¬subcategory Ã™â€šÃ˜Â¯Ã™Å Ã™â€¦Ã˜Â©
+         * Ã˜Â¥Ã˜Â°Ã˜Â§ Ã˜ÂªÃ˜ÂºÃ™Å Ã˜Â±Ã˜Âª Ã˜Â§Ã™â€žÃ™ÂÃ˜Â¦Ã˜Â© Ã˜Â§Ã™â€žÃ˜Â£Ã˜Â³Ã˜Â§Ã˜Â³Ã™Å Ã˜Â©.
          */
         subCategory:
           categoryChanged
@@ -851,229 +500,7 @@ export default function EditItemScreen() {
     router.back();
   }
 
-  /* =======================================================
-   * Queue replacement image
-   * ===================================================== */
 
-  async function queueReplacementImage(
-    userId:
-      string,
-    localImage:
-      SelectedLocalImage
-  ): Promise<void> {
-    if (
-      !itemId
-    ) {
-      throw new Error(
-        'The wardrobe item ID is missing.'
-      );
-    }
-
-    const queueService =
-      getDefaultScanItemQueueService();
-
-    await queueService
-      .initialize(
-        false
-      );
-
-    if (
-      !queueService
-        .hasExecutor()
-    ) {
-      throw new Error(
-        'The local image processing system is not ready.'
-      );
-    }
-
-    /**
-     * نحفظ نسخة الصورة الأصلية في التخزين،
-     * لكن هذه ليست النتيجة النهائية.
-     *
-     * الصورة المحلية تدخل EdgeSAM.
-     */
-    const uploadedOriginalImage =
-      await uploadWardrobeImage(
-        localImage.uri,
-        userId
-      );
-
-    const batchId =
-      createProcessingBatchId();
-
-    const queueId =
-      queueService
-        .getSnapshot()
-        .queueId;
-
-    const categoryChanged =
-      loadedItem?.category !==
-      category;
-
-    const resolvedSubcategory =
-      categoryChanged
-        ? null
-        : loadedItem
-            ?.subCategory ??
-          null;
-
-    /**
-     * القطعة تبقى موجودة في الدولاب،
-     * لكن حالتها تصبح queued حتى ينتهي EdgeSAM.
-     */
-    await updateWardrobeItem(
-      itemId,
-      {
-        image:
-          uploadedOriginalImage,
-
-        name:
-          name.trim(),
-
-        category,
-
-        subCategory:
-          resolvedSubcategory,
-
-        color,
-
-        original_image_path:
-          uploadedOriginalImage,
-
-        cleaned_image_path:
-          null,
-
-        processing_status:
-          'queued',
-
-        processing_error:
-          null,
-
-        processing_started_at:
-          null,
-
-        processing_finished_at:
-          null,
-      }
-    );
-
-    const source =
-      createQueueSource(
-        localImage
-      );
-
-    const wardrobe =
-      createWardrobeMetadata({
-        category,
-
-        itemName:
-          name.trim(),
-
-        color,
-
-        subcategory:
-          resolvedSubcategory,
-      });
-
-    const request:
-      CreateProcessingJobRequest = {
-      queueId,
-
-      batchId,
-
-      wardrobeItemId:
-        itemId,
-
-      source,
-
-      wardrobe,
-
-      priority:
-        10,
-
-      metadata: {
-        source:
-          'edit-item',
-
-        operation:
-          'replace-image',
-
-        userId,
-
-        originalRemoteImage:
-          uploadedOriginalImage,
-
-        summerMode:
-          true,
-      },
-    };
-
-    try {
-      const enqueueResult =
-        await queueService
-          .enqueueItem(
-            request,
-            true
-          );
-
-      if (
-        enqueueResult
-          .accepted
-          .length ===
-          0
-      ) {
-        const firstRejection =
-          enqueueResult
-            .rejected[0];
-
-        throw new Error(
-          firstRejection
-            ?.error
-            .message ||
-          'The replacement image could not be added to the processing queue.'
-        );
-      }
-
-      router.replace({
-        pathname:
-          '/processing-image',
-
-        params: {
-          batchId,
-        },
-      } as never);
-    } catch (error) {
-      const message =
-        getUnknownErrorMessage(
-          error
-        );
-
-      /**
-       * لو فشل إدخال الـJob، نظهر حالة الفشل
-       * بدل ترك القطعة معلقة على queued.
-       */
-      try {
-        await updateWardrobeItem(
-          itemId,
-          {
-            processing_status:
-              'failed',
-
-            processing_error:
-              message,
-
-            processing_finished_at:
-              new Date()
-                .toISOString(),
-          }
-        );
-      } catch {
-        // لا نخفي خطأ الـQueue الأصلي.
-      }
-
-      throw error;
-    }
-  }
 
   /* =======================================================
    * Save
@@ -1093,47 +520,7 @@ export default function EditItemScreen() {
     );
 
     try {
-      const user =
-        await getCurrentUser();
-
-      if (
-        !user
-      ) {
-        Alert.alert(
-          t(
-            'auth.loginRequired'
-          ),
-          t(
-            'auth.loginFirst'
-          )
-        );
-
-        router.replace(
-          '/login' as never
-        );
-
-        return;
-      }
-
-      const imageChanged =
-        selectedLocalImage !==
-          null &&
-        image !==
-          originalImage;
-
-      if (
-        !imageChanged ||
-        !selectedLocalImage
-      ) {
-        await saveMetadataOnly();
-
-        return;
-      }
-
-      await queueReplacementImage(
-        user.id,
-        selectedLocalImage
-      );
+      await saveMetadataOnly();
     } catch (error) {
       Alert.alert(
         t(
@@ -1153,7 +540,7 @@ export default function EditItemScreen() {
     }
   }
 
-  /* =======================================================
+/* =======================================================
    * Loading
    * ===================================================== */
 
@@ -1228,41 +615,6 @@ export default function EditItemScreen() {
         />
       ) : null}
 
-      {selectedLocalImage ? (
-        <Text
-          style={
-            styles.processingNotice
-          }
-        >
-          The new photo will be processed locally before it replaces the current item.
-        </Text>
-      ) : null}
-
-      <TouchableOpacity
-        style={[
-          styles.changePhotoButton,
-
-          saving &&
-            styles.disabledButton,
-        ]}
-        onPress={
-          changePhoto
-        }
-        disabled={
-          saving
-        }
-      >
-        <Text
-          style={
-            styles.changePhotoText
-          }
-        >
-          📸{' '}
-          {t(
-            'editItem.changePhoto'
-          )}
-        </Text>
-      </TouchableOpacity>
 
       <Text
         style={
@@ -1562,53 +914,6 @@ const styles =
         '#e5e5e5',
     },
 
-    processingNotice: {
-      marginBottom:
-        15,
-
-      paddingHorizontal:
-        10,
-
-      color:
-        '#bcbcbc',
-
-      fontSize:
-        12,
-
-      lineHeight:
-        18,
-
-      textAlign:
-        'center',
-    },
-
-    changePhotoButton: {
-      marginBottom:
-        25,
-
-      padding:
-        14,
-
-      borderRadius:
-        25,
-
-      alignItems:
-        'center',
-
-      backgroundColor:
-        '#222',
-    },
-
-    changePhotoText: {
-      color:
-        'white',
-
-      fontSize:
-        16,
-
-      fontWeight:
-        'bold',
-    },
 
     label: {
       marginBottom:

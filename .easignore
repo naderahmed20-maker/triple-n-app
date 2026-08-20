@@ -75,3 +75,25 @@ assets/models/*.tmp.db
 !assets/
 !assets/models/
 !assets/models/birefnet_full_1024.db
+# =========================================================
+# Local review / backup files - never upload to EAS
+# =========================================================
+.native-integration-audit/
+ios-crashes/
+vscode/
+supabase/.temp/
+*.before-*
+*.before-*
+TRIPLE_N_FULL_REVIEW.txt
+pre-build-audit.txt
+triple-n-7-problems.zip
+neline
+fix_triple_n_phase1.ps1
+app.json.before-apple-entitlement-final
+
+# Local/unused BiRefNet files
+assets/models/birefnet_full_1024_fp16.db
+assets/models/birefnet_full_1024_fp32_backup.db
+
+# Native build caches
+modules/triple-n-background/android/.gradle/

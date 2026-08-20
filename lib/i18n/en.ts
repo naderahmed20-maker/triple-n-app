@@ -127,16 +127,11 @@ const en = {
   'addItem.photoInstructions':
     'Place one item on a plain background and keep the whole item inside the frame.',
   'addItem.scanItem': 'Scan Item',
-  'addItem.gallery': 'Gallery',
-  'addItem.chooseGallery': 'Choose from Gallery',
   'addItem.photoHint':
     'One item • plain background • full item visible',
   'addItem.cameraPermission': 'Camera permission',
   'addItem.cameraPermissionMessage':
     'Allow camera access to photograph your clothing.',
-  'addItem.photosPermission': 'Photos permission',
-  'addItem.photosPermissionMessage':
-    'Allow photo access to choose a clothing image.',
   'addItem.preparingPhoto': 'Preparing photo...',
   'addItem.photoError': 'Image error',
   'addItem.photoErrorMessage': 'Could not prepare this image.',
@@ -169,7 +164,6 @@ const en = {
   'editItem.title': 'Edit Item',
   'editItem.notFound': 'Item not found',
   'editItem.loadFailed': 'Failed to load item.',
-  'editItem.changePhoto': 'Change Photo',
   'editItem.itemNamePlaceholder': 'Example: Black T-shirt',
   'editItem.chooseCategory': 'Choose Category',
   'editItem.chooseColor': 'Choose Color',
@@ -635,7 +629,7 @@ const en = {
 
   'helpCenter.addClothesTitle': 'Add Clothes',
   'helpCenter.addClothesSubtitle': 'Build your digital wardrobe',
-  'helpCenter.addClothesMessage': 'Go to Wardrobe → Add Item → Choose Photo → Select Category → Save.',
+  'helpCenter.addClothesMessage': 'Go to Wardrobe -> Scan Item -> take the photo -> add the item to your wardrobe.',
 
   'helpCenter.aiTitle': 'AI Outfit Suggestions',
   'helpCenter.aiSubtitle': 'How Triple N builds outfits',
@@ -705,8 +699,7 @@ const en = {
 'about.shareApp':
   'Share Triple N',
 
-'about.shareMessage':
-  'Check out Triple N — AI Fashion Assistant.\nDownload coming soon.',
+'about.shareMessage': 'Check out Triple N - AI Fashion Assistant.',
 
 'about.shareError':
   'Unable to share the app right now.',
@@ -827,7 +820,7 @@ const en = {
   'This upload was cancelled.',
 
 'processingImage.removingBackground':
-  'Triple N AI is removing the background. You can leave and processing will continue.',
+  'Triple N AI is removing the background. Keep Triple N open while processing finishes.',
 
 'processingImage.readStatusError':
   'Could not read the upload status.',
@@ -878,13 +871,13 @@ const en = {
   'Refreshing...',
 
 'processingImage.canLeaveScreen':
-  'You can leave this screen',
+  'Keep Triple N open',
 
 'processingImage.workerContinues':
-  'The worker will continue processing your images in the background.',
+  'You can return to your wardrobe, but keep Triple N in the foreground while processing finishes.',
 
 'processingImage.continueInBackground':
-  'Continue in background',
+  'Back to wardrobe',
 
   // Outfit Canvas
 'outfitCanvas.generateOutfit':
