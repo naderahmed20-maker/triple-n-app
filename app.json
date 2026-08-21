@@ -46,7 +46,7 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Triple N uses the camera to scan and add clothing items to your wardrobe.",
         "NSPhotoLibraryAddUsageDescription": "Triple N saves outfit previews and exported images to your photo library.",
-        "NSLocationWhenInUseUsageDescription": "Triple N uses your approximate location to provide weather-based outfit suggestions."
+        "NSLocationWhenInUseUsageDescription": "Triple N uses your current location to provide weather-based outfit suggestions."
       }
     },
     "android": {

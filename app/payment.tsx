@@ -453,6 +453,40 @@ export default function PaymentScreen() {
        * Start unified payment flow
        * ------------------------------------------------- */
 
+      /* ---------------------------------------------------
+
+       * Active subscription pre-check
+
+       * ------------------------------------------------- */
+
+
+      const existingAccess =
+
+        await checkSubscriptionAccess(
+
+          user.id
+
+        );
+
+
+      if (
+
+        existingAccess.hasAccess
+
+      ) {
+
+        router.replace(
+
+          '/home' as never
+
+        );
+
+
+        return;
+
+      }
+
+
       const result =
         await startPaymentFlow({
           userId:

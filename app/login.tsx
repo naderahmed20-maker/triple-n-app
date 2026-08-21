@@ -148,6 +148,11 @@ export default function LoginScreen() {
 
             password:
               cleanPassword,
+
+            options: {
+              emailRedirectTo:
+                'triplen://login',
+            },
           });
 
       if (error) {
