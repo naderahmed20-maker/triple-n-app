@@ -81,7 +81,7 @@ export default function OnboardingScreen() {
       });
 
       router.replace(
-        '/app/home' as any
+        '/home' as any
       );
     } catch (error: unknown) {
       const message =
