@@ -450,6 +450,14 @@ async function throwDetailedFunctionError(
   }
 
   if (
+  diagnostic.status === 409
+) {
+  throw new Error(
+    'SUBSCRIPTION_ALREADY_ACTIVE: You already have an active Triple N subscription.'
+  );
+}
+
+  if (
     diagnostic.status
   ) {
     throw new Error(
